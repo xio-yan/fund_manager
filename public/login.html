@@ -1,36 +1,30 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>登入</title>
-</head>
+<head><meta charset="UTF-8"><title>後台登入</title></head>
 <body>
-  <h1>出納後台登入</h1>
-  <form id="loginForm">
-    <label>帳號: </label><input type="text" id="username"><br>
-    <label>密碼: </label><input type="password" id="password"><br>
-    <button type="submit">登入</button>
-    <button type="button" onclick="location.href='index.html'">返回首頁</button>
-  </form>
+<h1>後台登入</h1>
+<label>帳號: <input id="username"></label><br>
+<label>密碼: <input type="password" id="password"></label><br>
+<button onclick="login()">登入</button>
+<button onclick="location.href='index.html'">返回首頁</button>
 
-  <script>
-    document.getElementById('loginForm').addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-      const res = await fetch('/login', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ username, password })
-      });
-      const data = await res.json();
-      if(data.success){
-        sessionStorage.setItem('username', username);
-        sessionStorage.setItem('isAdmin', data.isAdmin);
-        location.href='dashboard.html';
-      } else {
-        alert('帳號或密碼錯誤');
-      }
-    });
-  </script>
+<script>
+async function login(){
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+  const res = await fetch('/login',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username,password})
+  });
+  const data = await res.json();
+  if(data.success){
+    sessionStorage.setItem('user', JSON.stringify({username}));
+    location.href='dashboard.html';
+  } else {
+    alert(data.message);
+  }
+}
+</script>
 </body>
 </html>
