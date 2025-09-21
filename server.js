@@ -64,6 +64,12 @@ function checkAuth(req,res,next){
   else res.redirect('/login.html');
 }
 
+// 登出
+app.post('/logout', (req,res)=>{
+  req.session.destroy();
+  res.send({ message:'已登出' });
+});
+
 app.get('/dashboard.html', checkAuth, (req,res,next)=>{ next(); });
 
 // ===== 新增預支 =====
@@ -89,15 +95,20 @@ app.post('/advance', (req,res)=>{
 app.get('/advances', (req,res)=>{
   db.all(`SELECT * FROM advances`, (err,advances)=>{
     if(err) return res.status(500).send(err.message);
-    let result = [];
-    let count=0;
     if(advances.length===0) return res.send([]);
+
+    let result = [];
+    let count = 0;
+
     advances.forEach(a=>{
       db.all(`SELECT * FROM advance_items WHERE advance_id=?`, [a.id], (err,items)=>{
         if(err) return res.status(500).send(err.message);
         result.push({ ...a, items });
         count++;
-        if(count===advances.length) res.send(result);
+        if(count === advances.length) {
+          result.sort((x,y)=>x.id-y.id);
+          res.send(result);
+        }
       });
     });
   });
@@ -123,6 +134,15 @@ app.post('/repay', (req,res)=>{
     if(err) return res.status(500).send(err.message);
     db.run(`UPDATE advances SET status='repaid' WHERE id=?`, [advance_id]);
     res.send({ message:'還款完成', remaining_cash });
+  });
+});
+
+// ===== 查詢單筆活動的還款紀錄 =====
+app.get('/repayments', (req,res)=>{
+  const advance_id = req.query.advance_id;
+  db.all(`SELECT * FROM repayments WHERE advance_id=? ORDER BY id ASC`, [advance_id], (err, rows)=>{
+    if(err) return res.status(500).send(err.message);
+    res.send(rows);
   });
 });
 
