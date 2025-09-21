@@ -5,6 +5,8 @@
   <style>
     table, th, td { border:1px solid black; border-collapse: collapse; padding:5px; }
     th { background-color:#f2f2f2; }
+    .items-table { margin-top:5px; margin-bottom:10px; }
+    .items-table th { background-color:#ddd; }
   </style>
 </head>
 <body>
@@ -28,7 +30,60 @@
       advances = await res.json();
       const tbody = document.querySelector('#advancesTable tbody');
       tbody.innerHTML='';
+
       advances.forEach(a=>{
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${a.id}</td>
+        tr.innerHTML = `
+          <td>${a.id}</td>
           <td>${a.name}</td>
+          <td>${a.activity}</td>
+          <td>${a.apply_date}</td>
+          <td>${a.total_amount}</td>
+          <td>${a.status}</td>
+          <td>
+            ${a.status==='pending'?`<button onclick="markPaid(${a.id})">標記給款</button>`:''}
+            ${a.status==='paid'?`<button onclick="repay(${a.id})">登記還款</button>`:''}
+          </td>
+        `;
+        tbody.appendChild(tr);
+
+        // 顯示細項
+        const tr2 = document.createElement('tr');
+        const td2 = document.createElement('td');
+        td2.colSpan=7;
+        let itemsHtml='<table class="items-table"><tr><th>用途</th><th>金額</th><th>來源</th></tr>';
+        a.items.forEach(i=>{
+          itemsHtml += `<tr><td>${i.description}</td><td>${i.amount}</td><td>${i.source==='school'?'學校':'學生會'}</td></tr>`;
+        });
+        itemsHtml += '</table>';
+        td2.innerHTML = itemsHtml;
+        tr2.appendChild(td2);
+        tbody.appendChild(tr2);
+      });
+    }
+
+    async function markPaid(id){
+      await fetch('/markPaid/'+id, { method:'POST' });
+      loadAdvances();
+    }
+
+    async function repay(id){
+      const advance = advances.find(a=>a.id===id);
+      let school_paid = parseFloat(prompt('輸入學校補助金額', 0));
+      let student_council_paid = parseFloat(prompt('輸入學生會補助金額', 0));
+      let remaining_cash = advance.total_amount - school_paid - student_council_paid;
+      if(remaining_cash<0) { alert('補助金額超過總金額'); return; }
+      if(!confirm(`剩餘現金: ${remaining_cash} 元，確認已收現金嗎？`)) return;
+
+      await fetch('/repay',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ advance_id:id, school_paid, student_council_paid, remaining_cash })
+      });
+      loadAdvances();
+    }
+
+    loadAdvances();
+  </script>
+</body>
+</html>
