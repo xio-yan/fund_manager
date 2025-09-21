@@ -22,19 +22,6 @@
 <hr>
 
 <h2>預支管理</h2>
-<button id="addAdvanceBtn" onclick="showAdvanceForm()">新增預支</button>
-<div id="advanceForm" class="hidden">
-  <h3>新增預支</h3>
-  <label>姓名: <input id="advName"></label><br>
-  <label>活動: <input id="advActivity"></label><br>
-  <div id="itemsContainer">
-    <h4>項目</h4>
-  </div>
-  <button onclick="addItem()">新增項目</button><br><br>
-  <button onclick="submitAdvance()">送出預支</button>
-  <button onclick="hideAdvanceForm()">取消</button>
-</div>
-
 <table id="advTable">
   <thead>
     <tr><th>ID</th><th>姓名</th><th>活動</th><th>申請日期</th><th>總金額</th><th>狀態</th><th>操作</th></tr>
@@ -64,64 +51,30 @@ let currentUser = JSON.parse(sessionStorage.getItem('user'));
 document.getElementById('currentUser').innerText = `登入使用者：${currentUser.username} (${currentUser.role})`;
 
 //// 預支管理 ////
-function showAdvanceForm(){ document.getElementById('advanceForm').classList.remove('hidden'); }
-function hideAdvanceForm(){ document.getElementById('advanceForm').classList.add('hidden'); }
-
-function addItem(){
-  const container = document.getElementById('itemsContainer');
-  const div = document.createElement('div');
-  div.innerHTML = `
-    項目名稱: <input class="itemName">
-    金額: <input type="number" class="itemAmount">
-    來源: <select class="itemSource"><option value="school">學校</option><option value="student_council">學生會</option></select>
-    <button onclick="this.parentNode.remove()">刪除</button>
-  `;
-  container.appendChild(div);
-}
-
-async function submitAdvance(){
-  const name = document.getElementById('advName').value;
-  const activity = document.getElementById('advActivity').value;
-  const itemsDivs = document.querySelectorAll('#itemsContainer > div');
-  const items = Array.from(itemsDivs).map(d=>({
-    name:d.querySelector('.itemName').value,
-    amount: parseFloat(d.querySelector('.itemAmount').value),
-    source: d.querySelector('.itemSource').value
-  }));
-  await fetch('/advances',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, activity, items})});
-  hideAdvanceForm();
-  loadAdvances();
-}
-
-async function markPaid(id){
-  await fetch('/markPaid/'+id,{method:'POST'});
-  loadAdvances();
-}
-
 async function loadAdvances(){
   const res = await fetch('/advances');
   const advances = await res.json();
   const tbody = document.querySelector('#advTable tbody');
   tbody.innerHTML='';
   advances.forEach(a=>{
-    let ops = '';
-    if(a.status==='pending') ops += `<button onclick="markPaid(${a.id})">給款</button>`;
-    ops += ` <button onclick="showRepayForm(${a.id})">還款</button>`;
-    tbody.innerHTML += `<tr>
+    let ops='';
+    if(a.status==='pending') ops=`<button onclick="markPaid(${a.id})">給款</button>`;
+    ops+=` <button onclick="repay(${a.id})">還款</button>`;
+    tbody.innerHTML+=`<tr>
       <td>${a.id}</td><td>${a.name}</td><td>${a.activity}</td><td>${a.apply_date}</td><td>${a.total_amount}</td><td>${a.status}</td><td>${ops}</td>
     </tr>`;
   });
 }
 
-//// 還款表單 ////
-function showRepayForm(id){
-  const school = prompt("學校補助金額?");
-  const sc = prompt("學生會補助金額?");
-  fetch('/repay',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
-    advance_id:id,
-    school_paid: parseFloat(school),
-    student_council_paid: parseFloat(sc)
-  })}).then(r=>r.json()).then(d=>{ alert(`剩餘現金: ${d.remaining_cash}`); loadAdvances(); });
+async function markPaid(id){ await fetch('/markPaid/'+id,{method:'POST'}); loadAdvances(); }
+
+async function repay(id){
+  const school = parseFloat(prompt('學校補助金額?'));
+  const sc = parseFloat(prompt('學生會補助金額?'));
+  const res = await fetch('/repay',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({advance_id:id, school_paid:school, student_council_paid:sc})});
+  const data = await res.json();
+  alert(`剩餘現金: ${data.remaining_cash}`);
+  loadAdvances();
 }
 
 //// 用戶管理 ////
@@ -129,30 +82,13 @@ function showAddUserForm(){ document.getElementById('userForm').classList.remove
 function cancelUserForm(){ document.getElementById('userForm').classList.add('hidden'); }
 
 async function submitUserForm(){
-  const username = document.getElementById('newUsername').value;
-  const password = document.getElementById('newPassword').value;
-  const role = document.getElementById('newRole').value;
-  const res = await fetch('/users',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username,password,role})});
-  const data = await res.json();
+  const username=document.getElementById('newUsername').value;
+  const password=document.getElementById('newPassword').value;
+  const role=document.getElementById('newRole').value;
+  const res=await fetch('/users',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username,password,role})});
+  const data=await res.json();
   alert(data.message);
-  document.getElementById('userForm').classList.add('hidden');
-  loadUsers();
-}
-
-async function deleteUser(username){
-  if(!confirm(`確定刪除 ${username} ?`)) return;
-  const res = await fetch('/users/'+username,{method:'DELETE'});
-  const data = await res.json();
-  alert(data.message);
-  loadUsers();
-}
-
-async function showChangePasswordForm(username){
-  const newPassword = prompt("輸入新密碼:");
-  if(!newPassword) return;
-  const res = await fetch('/users/'+username+'/password',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({newPassword})});
-  const data = await res.json();
-  alert(data.message);
+  cancelUserForm();
   loadUsers();
 }
 
@@ -164,14 +100,31 @@ async function loadUsers(){
   users.forEach(u=>{
     let ops='';
     if(currentUser.role==='admin'){
-      ops += `<button onclick="showChangePasswordForm('${u.username}')">修改密碼</button>`;
-      if(u.username!=='admin') ops += ` <button onclick="deleteUser('${u.username}')">刪除</button>`;
+      ops+=`<button onclick="changePassword('${u.username}')">修改密碼</button>`;
+      if(u.username!=='admin') ops+=` <button onclick="deleteUser('${u.username}')">刪除</button>`;
     } else if(currentUser.username===u.username){
-      ops += `<button onclick="showChangePasswordForm('${u.username}')">修改密碼</button>`;
+      ops+=`<button onclick="changePassword('${u.username}')">修改密碼</button>`;
     }
-    tbody.innerHTML += `<tr><td>${u.username}</td><td>${u.role}</td><td>${ops}</td></tr>`;
+    tbody.innerHTML+=`<tr><td>${u.username}</td><td>${u.role}</td><td>${ops}</td></tr>`;
   });
-  document.getElementById('showAddUserBtn').style.display=(currentUser.role==='admin')?'inline-block':'none';
+  document.getElementById('showAddUserBtn').style.display = (currentUser.role==='admin')?'inline-block':'none';
+}
+
+async function deleteUser(username){
+  if(!confirm(`確定刪除 ${username}?`)) return;
+  const res=await fetch('/users/'+username,{method:'DELETE'});
+  const data=await res.json();
+  alert(data.message);
+  loadUsers();
+}
+
+async function changePassword(username){
+  const newPwd = prompt('輸入新密碼');
+  if(!newPwd) return;
+  const res = await fetch('/users/'+username+'/password',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({newPassword:newPwd})});
+  const data = await res.json();
+  alert(data.message);
+  loadUsers();
 }
 
 function logout(){ fetch('/logout',{method:'POST'}).then(()=>location.href='index.html'); }
