@@ -11,7 +11,7 @@ app.use(session({
   saveUninitialized: true
 }));
 
-// ---------- 資料存放 ----------
+// --------- 資料存放 ---------
 let users = [
   { username: 'admin', password: 'admin', role: 'admin' },
   { username: 'khuscsu', password: '23rdkhuscsu', role: 'manager' }
@@ -20,13 +20,13 @@ let users = [
 let advances = [];
 let repayments = [];
 
-// ---------- 登入 / 登出 ----------
+// --------- 登入 / 登出 ---------
 app.post('/login', (req,res)=>{
   const { username, password } = req.body;
   const user = users.find(u=>u.username===username && u.password===password);
   if(user){
     req.session.user = { username: user.username, role: user.role };
-    res.json({ success:true, role:user.role, username:user.username });
+    res.json({ success:true, username:user.username, role:user.role });
   } else res.json({ success:false });
 });
 
@@ -35,7 +35,7 @@ app.post('/logout', (req,res)=>{
   res.json({success:true});
 });
 
-// ---------- 權限中介 ----------
+// --------- 權限中介 ---------
 function authAdmin(req,res,next){
   if(!req.session.user || req.session.user.role!=='admin') return res.status(403).json({ message:'無權限' });
   next();
@@ -46,7 +46,7 @@ function authLoggedIn(req,res,next){
   next();
 }
 
-// ---------- 用戶管理 API ----------
+// --------- 用戶管理 API ---------
 app.get('/users', authLoggedIn, (req,res)=>{
   res.json(users.map(u=>({username:u.username, role:u.role})));
 });
@@ -79,13 +79,14 @@ app.delete('/users/:username', authAdmin, (req,res)=>{
   res.json({message:'刪除成功'});
 });
 
-// ---------- 預支管理 ----------
+// --------- 預支管理 API ---------
 app.get('/advances', authLoggedIn, (req,res)=>{
   res.json(advances);
 });
 
 app.post('/advances', authLoggedIn, (req,res)=>{
   const { name, activity, items } = req.body;
+  if(!name || !activity || !items || items.length===0) return res.json({message:'資料不完整'});
   const total_amount = items.reduce((sum,i)=>sum+i.amount,0);
   const advance = {
     id: advances.length+1,
@@ -106,12 +107,11 @@ app.post('/markPaid/:id', authLoggedIn, (req,res)=>{
   res.json({message:'已標記給款'});
 });
 
-// ---------- 還款管理 ----------
+// --------- 還款管理 ---------
 app.post('/repay', authLoggedIn, (req,res)=>{
   const { advance_id, school_paid, student_council_paid } = req.body;
   const advance = advances.find(a=>a.id===advance_id);
   if(!advance) return res.json({message:'找不到預支'});
-
   const remaining_cash = advance.total_amount - school_paid - student_council_paid;
   repayments.push({
     advance_id,
@@ -120,7 +120,6 @@ app.post('/repay', authLoggedIn, (req,res)=>{
     remaining_cash,
     repayment_date: new Date().toLocaleDateString()
   });
-
   res.json({message:'已登記還款', remaining_cash});
 });
 
@@ -129,6 +128,6 @@ app.get('/repayments', authLoggedIn, (req,res)=>{
   res.json(repayments.filter(r=>r.advance_id===advance_id));
 });
 
-// ---------- 啟動 ----------
+// --------- 啟動服務 ---------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, ()=>console.log(`Server running on port ${PORT}`));
