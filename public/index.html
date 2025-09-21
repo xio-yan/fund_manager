@@ -8,28 +8,58 @@
   <h1>經費預支登記</h1>
   <form id="advanceForm">
     姓名：<input type="text" name="applicant" required><br>
-    用途：<input type="text" name="description" required><br>
-    金額：<input type="number" name="amount" required><br>
-    來源：<input type="text" name="source" required><br>
-    <button type="submit">送出</button>
+    活動名稱：<input type="text" name="activityName" required><br>
+
+    <div id="itemsContainer">
+      <h3>款項明細</h3>
+      <div class="item">
+        用途：<input name="description" required>
+        金額：<input type="number" name="amount" required>
+        來源：<input name="source" required>
+      </div>
+    </div>
+    <button type="button" id="addItem">新增款項</button><br><br>
+    <button type="submit">送出申請</button>
   </form>
   <p id="message"></p>
   <br>
   <a href="/login.html">進入後台</a>
 
   <script>
-    document.getElementById("advanceForm").addEventListener("submit", async (e) => {
+    document.getElementById("addItem").addEventListener("click", () => {
+      const div = document.createElement("div");
+      div.className = "item";
+      div.innerHTML = `
+        用途：<input name="description" required>
+        金額：<input type="number" name="amount" required>
+        來源：<input name="source" required>
+      `;
+      document.getElementById("itemsContainer").appendChild(div);
+    });
+
+    document.getElementById("advanceForm").addEventListener("submit", async e => {
       e.preventDefault();
-      const formData = Object.fromEntries(new FormData(e.target).entries());
-      const res = await fetch("/api/advance", {
+      const applicant = e.target.applicant.value;
+      const activityName = e.target.activityName.value;
+      const items = Array.from(document.querySelectorAll(".item")).map(it => ({
+        description: it.querySelector("[name='description']").value,
+        amount: it.querySelector("[name='amount']").value,
+        source: it.querySelector("[name='source']").value
+      }));
+      const res = await fetch("/api/activity", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ applicant, activityName, items })
       });
       const data = await res.json();
       if (data.success) {
-        document.getElementById("message").innerText = "已成功送出！";
+        document.getElementById("message").innerText = "送出成功！";
         e.target.reset();
+        document.getElementById("itemsContainer").innerHTML = `<h3>款項明細</h3><div class="item">
+          用途：<input name="description" required>
+          金額：<input type="number" name="amount" required>
+          來源：<input name="source" required>
+        </div>`;
       } else {
         document.getElementById("message").innerText = "送出失敗！";
       }
