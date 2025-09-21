@@ -35,7 +35,8 @@
         const table = document.createElement("table");
         table.border = 1;
         table.innerHTML = `<tr>
-          <th>用途</th><th>金額</th><th>來源</th><th>狀態</th><th>申請日</th><th>給款日</th><th>還款日</th><th>操作</th>
+          <th>用途</th><th>金額</th><th>來源</th><th>狀態</th>
+          <th>申請日</th><th>給款日</th><th>還款日</th><th>學校補助</th><th>學生會補助</th><th>剩餘現金</th><th>操作</th>
         </tr>`;
         act.items.forEach(item => {
           const tr = document.createElement("tr");
@@ -47,6 +48,9 @@
             <td>${item.applyDate}</td>
             <td>${item.payDate || ""}</td>
             <td>${item.repayDate || ""}</td>
+            <td>${item.schoolSubsidy}</td>
+            <td>${item.studentUnionSubsidy}</td>
+            <td>${item.cashReturn}</td>
             <td>
               ${item.status === "申請中" ? `<button onclick="pay(${act.id},${item.id})">已付款</button>` : ""}
               ${item.status === "已付款" ? `<button onclick="repayPrompt(${act.id},${item.id})">還款</button>` : ""}
