@@ -89,15 +89,21 @@ app.post('/advance', (req,res)=>{
 app.get('/advances', (req,res)=>{
   db.all(`SELECT * FROM advances`, (err,advances)=>{
     if(err) return res.status(500).send(err.message);
-    let result = [];
-    let count=0;
     if(advances.length===0) return res.send([]);
+
+    let result = [];
+    let count = 0;
+
     advances.forEach(a=>{
       db.all(`SELECT * FROM advance_items WHERE advance_id=?`, [a.id], (err,items)=>{
         if(err) return res.status(500).send(err.message);
         result.push({ ...a, items });
         count++;
-        if(count===advances.length) res.send(result);
+        if(count === advances.length) {
+          // 按ID排序
+          result.sort((x,y)=>x.id-y.id);
+          res.send(result);
+        }
       });
     });
   });
