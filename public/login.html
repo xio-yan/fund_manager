@@ -24,6 +24,8 @@
       });
       const data = await res.json();
       if(data.success){
+        sessionStorage.setItem('username', username);
+        sessionStorage.setItem('isAdmin', data.isAdmin);
         location.href='dashboard.html';
       } else {
         alert('帳號或密碼錯誤');
