@@ -31,9 +31,12 @@ app.post('/logout', (req,res)=>{
 });
 
 // ---------------------- 預支管理 ----------------------
+// 前台新增預支不用登入
 app.post('/advances',(req,res)=>{
-  if(!req.session.user) return res.status(401).json({message:'請先登入'});
   const { name, activity, items } = req.body; 
+  if(!name || !activity || !items || items.length===0)
+    return res.status(400).json({message:'資料不完整'});
+
   let total_amount = items.reduce((sum,i)=>sum+i.amount,0);
   advances.push({
     id: advanceId++,
@@ -48,6 +51,7 @@ app.post('/advances',(req,res)=>{
   res.json({message:'送出成功'});
 });
 
+// 後台查看預支紀錄需要登入
 app.get('/advances',(req,res)=>{
   if(!req.session.user) return res.status(401).json({message:'請先登入'});
   res.json(advances);
