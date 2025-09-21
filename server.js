@@ -84,7 +84,7 @@ app.get('/dashboard.html', checkAuth, (req,res,next)=>{ next(); });
 // ===== 新增預支 =====
 app.post('/advance', (req,res)=>{
   const { name, activity, items } = req.body;
-  const apply_date = taiwanDate(); // 台灣日期
+  const apply_date = taiwanDate();
   let total = 0;
   items.forEach(i=> total+=i.amount);
 
@@ -107,6 +107,61 @@ app.get('/advances', (req,res)=>{
     if(advances.length===0) return res.send([]);
 
     let result = [];
-    let c
+    let count = 0;
 
-         
+    advances.forEach(a=>{
+      db.all(`SELECT * FROM advance_items WHERE advance_id=?`, [a.id], (err,items)=>{
+        if(err) return res.status(500).send(err.message);
+        result.push({ ...a, items });
+        count++;
+        if(count === advances.length) {
+          result.sort((x,y)=>x.id-y.id);
+          res.send(result);
+        }
+      });
+    });
+  });
+});
+
+// ===== 標記已給款 =====
+app.post('/markPaid/:id', (req,res)=>{
+  const id = req.params.id;
+  const paid_date = taiwanDate();
+  db.run(`UPDATE advances SET status='paid', paid_date=? WHERE id=?`, [paid_date, id], function(err){
+    if(err) return res.status(500).send(err.message);
+    res.send({ message:'已標記給款', paid_date });
+  });
+});
+
+// ===== 登記還款 =====
+app.post('/repay', (req,res)=>{
+  const { advance_id, school_paid, student_council_paid } = req.body;
+  db.get(`SELECT total_amount FROM advances WHERE id=?`, [advance_id], (err,row)=>{
+    if(err) return res.status(500).send(err.message);
+    if(!row) return res.status(404).send({ message:'找不到預支紀錄' });
+    const remaining_cash = row.total_amount - school_paid - student_council_paid;
+    const repayment_date = taiwanDate();
+
+    db.run(`INSERT INTO repayments (advance_id, repayment_date, school_paid, student_council_paid, remaining_cash, confirmed)
+            VALUES (?,?,?,?,?,?)`,
+            [advance_id, repayment_date, school_paid, student_council_paid, remaining_cash, 1], (err)=>{
+      if(err) return res.status(500).send(err.message);
+      db.run(`UPDATE advances SET status='repaid' WHERE id=?`, [advance_id]);
+      res.send({ message:'還款完成', remaining_cash, repayment_date });
+    });
+  });
+});
+
+// ===== 查詢單筆活動的還款紀錄 =====
+app.get('/repayments', (req,res)=>{
+  const advance_id = req.query.advance_id;
+  db.all(`SELECT * FROM repayments WHERE advance_id=? ORDER BY id ASC`, [advance_id], (err, rows)=>{
+    if(err) return res.status(500).send(err.message);
+    res.send(rows);
+  });
+});
+
+// ===== 啟動伺服器 =====
+const listener = app.listen(process.env.PORT || 3000, ()=>{
+  console.log('Server running on port '+listener.address().port);
+});
