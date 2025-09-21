@@ -1,185 +1,136 @@
 const express = require('express');
-const bodyParser = require('body-parser');
 const session = require('express-session');
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-
+const bodyParser = require('body-parser');
 const app = express();
+
+app.use(express.static('public'));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({
-  secret: 'fundmanagersecret',
+  secret: 'mysecret',
   resave: false,
   saveUninitialized: true
 }));
 
-// ===== 資料庫 =====
-const db = new sqlite3.Database('./fund.db');
+// ---------- 資料存放 ----------
+let users = [
+  { username: 'admin', password: 'admin', role: 'admin' },
+  { username: 'khuscsu', password: '23rdkhuscsu', role: 'manager' }
+];
 
-db.serialize(()=>{
-  // 使用者
-  db.run(`CREATE TABLE IF NOT EXISTS users (
-    username TEXT PRIMARY KEY,
-    password TEXT,
-    isAdmin INTEGER
-  )`);
+let advances = [];
+let repayments = [];
 
-  // 預設使用者
-  db.get(`SELECT COUNT(*) AS cnt FROM users`, (err,row)=>{
-    if(row.cnt===0){
-      db.run(`INSERT INTO users (username,password,isAdmin) VALUES (?,?,?)`, ['admin','admin',1]);
-      db.run(`INSERT INTO users (username,password,isAdmin) VALUES (?,?,?)`, ['khuscsu','23rdkhuscsu',0]);
-    }
-  });
-
-  // 預支
-  db.run(`CREATE TABLE IF NOT EXISTS advances (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    activity TEXT,
-    apply_date TEXT,
-    total_amount REAL,
-    status TEXT
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS advance_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    advance_id INTEGER,
-    description TEXT,
-    amount REAL,
-    source TEXT
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS repayments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    advance_id INTEGER,
-    repayment_date TEXT,
-    school_paid REAL,
-    student_council_paid REAL,
-    remaining_cash REAL,
-    confirmed INTEGER
-  )`);
-});
-
-// ===== 靜態檔案 =====
-app.use(express.static('public'));
-
-// ===== 登入驗證 =====
-app.post('/login', (req,res)=>{
+// ---------- 登入 ----------
+app.post('/login', (req, res)=>{
   const { username, password } = req.body;
-  db.get(`SELECT * FROM users WHERE username=?`, [username], (err,row)=>{
-    if(err) return res.status(500).send(err.message);
-    if(row && row.password===password){
-      req.session.loggedIn = true;
-      req.session.username = username;
-      req.session.isAdmin = row.isAdmin===1;
-      res.send({ success:true, isAdmin: row.isAdmin===1 });
-    } else {
-      res.send({ success:false });
-    }
-  });
+  const user = users.find(u=>u.username===username && u.password===password);
+  if(user){
+    req.session.user = { username: user.username, role: user.role };
+    res.json({ success:true, role:user.role });
+  } else {
+    res.json({ success:false });
+  }
 });
 
-function checkAuth(req,res,next){
-  if(req.session.loggedIn) next();
-  else res.redirect('/login.html');
-}
-
-// 登出
+// ---------- 登出 ----------
 app.post('/logout', (req,res)=>{
   req.session.destroy();
-  res.send({ message:'已登出' });
+  res.json({success:true});
 });
 
-app.get('/dashboard.html', checkAuth, (req,res,next)=>{ next(); });
+// ---------- 用戶管理 API ----------
+function authAdmin(req,res,next){
+  if(!req.session.user || req.session.user.role!=='admin') return res.status(403).json({ message:'無權限' });
+  next();
+}
 
-// ===== 修改密碼 =====
-app.post('/changePassword', checkAuth, (req,res)=>{
-  const { targetUser, newPassword } = req.body;
-  if(targetUser!==req.session.username && !req.session.isAdmin){
-    return res.status(403).send({ message:'無權限修改其他使用者密碼' });
-  }
-  db.run(`UPDATE users SET password=? WHERE username=?`, [newPassword,targetUser], function(err){
-    if(err) return res.status(500).send(err.message);
-    res.send({ message:'修改成功' });
-  });
+function authLoggedIn(req,res,next){
+  if(!req.session.user) return res.status(401).json({ message:'請先登入' });
+  next();
+}
+
+// 取得所有使用者
+app.get('/users', authLoggedIn, (req,res)=>{
+  res.json(users.map(u=>({username:u.username, role:u.role})));
 });
 
-// ===== 新增預支 =====
-app.post('/advance', (req,res)=>{
+// 新增使用者（admin 才能）
+app.post('/users', authAdmin, (req,res)=>{
+  const { username, password, role } = req.body;
+  if(users.find(u=>u.username===username)) return res.json({message:'使用者已存在'});
+  users.push({username, password, role});
+  res.json({message:'新增成功'});
+});
+
+// 修改密碼
+app.post('/users/:username/password', authLoggedIn, (req,res)=>{
+  const { username } = req.params;
+  const { newPassword } = req.body;
+  const loginUser = req.session.user;
+
+  if(loginUser.role!=='admin' && loginUser.username!==username)
+    return res.status(403).json({message:'無權限'});
+
+  const user = users.find(u=>u.username===username);
+  if(!user) return res.json({message:'使用者不存在'});
+  user.password = newPassword;
+  res.json({message:'修改成功'});
+});
+
+// 刪除使用者（admin 才能，且不能刪 admin 自己）
+app.delete('/users/:username', authAdmin, (req,res)=>{
+  const { username } = req.params;
+  if(username==='admin') return res.json({message:'不能刪除 admin'});
+  const idx = users.findIndex(u=>u.username===username);
+  if(idx===-1) return res.json({message:'使用者不存在'});
+  users.splice(idx,1);
+  res.json({message:'刪除成功'});
+});
+
+// ---------- 預支管理 API ----------
+app.get('/advances', authLoggedIn, (req,res)=>{
+  res.json(advances);
+});
+
+app.post('/advances', authLoggedIn, (req,res)=>{
   const { name, activity, items } = req.body;
-  const apply_date = new Date().toISOString().split('T')[0];
-  let total = 0;
-  items.forEach(i=> total+=i.amount);
-
-  db.run(`INSERT INTO advances (name, activity, apply_date, total_amount, status)
-          VALUES (?,?,?,?,?)`, [name, activity, apply_date, total, 'pending'], function(err){
-    if(err) return res.status(500).send(err.message);
-    const advance_id = this.lastID;
-    items.forEach(item=>{
-      db.run(`INSERT INTO advance_items (advance_id, description, amount, source) VALUES (?,?,?,?)`,
-              [advance_id, item.description, item.amount, item.source]);
-    });
-    res.send({ message:'預支成功', advance_id });
-  });
+  const total_amount = items.reduce((sum,i)=>sum+i.amount,0);
+  const advance = {
+    id: advances.length+1,
+    name, activity, items,
+    apply_date: new Date().toLocaleDateString(),
+    total_amount,
+    status:'pending'
+  };
+  advances.push(advance);
+  res.json({message:'預支申請成功'});
 });
 
-// ===== 查詢所有預支及明細 =====
-app.get('/advances', (req,res)=>{
-  db.all(`SELECT * FROM advances`, (err,advances)=>{
-    if(err) return res.status(500).send(err.message);
-    if(advances.length===0) return res.send([]);
-
-    let result = [];
-    let count = 0;
-
-    advances.forEach(a=>{
-      db.all(`SELECT * FROM advance_items WHERE advance_id=?`, [a.id], (err,items)=>{
-        if(err) return res.status(500).send(err.message);
-        result.push({ ...a, items });
-        count++;
-        if(count === advances.length) {
-          result.sort((x,y)=>x.id-y.id);
-          res.send(result);
-        }
-      });
-    });
-  });
+// 標記給款
+app.post('/markPaid/:id', authLoggedIn, (req,res)=>{
+  const id = parseInt(req.params.id);
+  const advance = advances.find(a=>a.id===id);
+  if(!advance) return res.json({message:'找不到預支'});
+  advance.status='paid';
+  res.json({message:'已標記給款'});
 });
 
-// ===== 標記已給款 =====
-app.post('/markPaid/:id', (req,res)=>{
-  const id = req.params.id;
-  db.run(`UPDATE advances SET status='paid' WHERE id=?`, [id], function(err){
-    if(err) return res.status(500).send(err.message);
-    res.send({ message:'已標記給款' });
-  });
-});
-
-// ===== 登記還款 =====
-app.post('/repay', (req,res)=>{
+// 登記還款
+app.post('/repay', authLoggedIn, (req,res)=>{
   const { advance_id, school_paid, student_council_paid, remaining_cash } = req.body;
-  const repayment_date = new Date().toISOString().split('T')[0];
-
-  db.run(`INSERT INTO repayments (advance_id, repayment_date, school_paid, student_council_paid, remaining_cash, confirmed)
-          VALUES (?,?,?,?,?,?)`,
-          [advance_id, repayment_date, school_paid, student_council_paid, remaining_cash, 1], (err)=>{
-    if(err) return res.status(500).send(err.message);
-    db.run(`UPDATE advances SET status='repaid' WHERE id=?`, [advance_id]);
-    res.send({ message:'還款完成', remaining_cash });
+  repayments.push({
+    advance_id, school_paid, student_council_paid, remaining_cash,
+    repayment_date: new Date().toLocaleDateString()
   });
+  res.json({message:'已登記還款'});
 });
 
-// ===== 查詢單筆活動的還款紀錄 =====
-app.get('/repayments', (req,res)=>{
-  const advance_id = req.query.advance_id;
-  db.all(`SELECT * FROM repayments WHERE advance_id=? ORDER BY id ASC`, [advance_id], (err, rows)=>{
-    if(err) return res.status(500).send(err.message);
-    res.send(rows);
-  });
+// 取得特定預支的還款紀錄
+app.get('/repayments', authLoggedIn, (req,res)=>{
+  const advance_id = parseInt(req.query.advance_id);
+  res.json(repayments.filter(r=>r.advance_id===advance_id));
 });
 
-// ===== 啟動伺服器 =====
-const listener = app.listen(process.env.PORT || 3000, ()=>{
-  console.log('Server running on port '+listener.address().port);
-});
+// ---------- 啟動 ----------
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, ()=>console.log(`Server running on port ${PORT}`));
