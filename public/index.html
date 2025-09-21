@@ -45,18 +45,11 @@
         <button type="button" class="removeItem">刪除</button>
       `;
       document.getElementById("itemsContainer").appendChild(div);
-
-      div.querySelector(".removeItem").addEventListener("click", () => {
-        div.remove();
-      });
+      div.querySelector(".removeItem").addEventListener("click", () => div.remove());
     }
 
     document.getElementById("addItem").addEventListener("click", addItem);
-
-    // 刪除初始那筆
-    document.querySelector(".removeItem").addEventListener("click", function() {
-      this.parentElement.remove();
-    });
+    document.querySelector(".removeItem").addEventListener("click", function() { this.parentElement.remove(); });
 
     document.getElementById("advanceForm").addEventListener("submit", async e => {
       e.preventDefault();
@@ -87,9 +80,7 @@
           </select>
           <button type="button" class="removeItem">刪除</button>
         </div>`;
-        document.querySelector(".removeItem").addEventListener("click", function() {
-          this.parentElement.remove();
-        });
+        document.querySelector(".removeItem").addEventListener("click", function() { this.parentElement.remove(); });
       } else {
         document.getElementById("message").innerText = "送出失敗！";
       }
