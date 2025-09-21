@@ -1,10 +1,6 @@
 <!DOCTYPE html>
 <html>
-<head>
-<meta charset="UTF-8">
-<title>後台管理</title>
-<style>.hidden{display:none;}</style>
-</head>
+<head><meta charset="UTF-8"><title>後台管理</title></head>
 <body>
 <h1>後台管理</h1>
 <div>
@@ -21,29 +17,10 @@
 <tbody></tbody>
 </table>
 
-<h2>用戶管理</h2>
-<div id="userForm" class="hidden">
-<h3>新增使用者</h3>
-<label>帳號: <input id="newUsername"></label><br>
-<label>密碼: <input id="newPassword"></label><br>
-<label>權限: 
-<select id="newRole"><option value="admin">admin</option><option value="manager">管理員</option></select>
-</label><br>
-<button onclick="submitUserForm()">確認</button>
-<button onclick="cancelUserForm()">取消</button>
-</div>
-
-<button id="showAddUserBtn" onclick="showAddUserForm()">新增使用者</button>
-<table id="usersTable" border="1">
-<thead><tr><th>帳號</th><th>權限</th><th>操作</th></tr></thead>
-<tbody></tbody>
-</table>
-
 <script>
 let currentUser = JSON.parse(sessionStorage.getItem('user'));
-document.getElementById('currentUser').innerText = `登入使用者：${currentUser.username} (${currentUser.role})`;
+document.getElementById('currentUser').innerText = `登入使用者：${currentUser.username}`;
 
-// 預支管理
 async function loadAdvances(){
   const res = await fetch('/advances');
   const advances = await res.json();
@@ -64,67 +41,19 @@ async function markPaid(id){ await fetch('/markPaid/'+id,{method:'POST'}); loadA
 async function repay(id){
   const school = parseFloat(prompt('學校補助金額?'));
   const sc = parseFloat(prompt('學生會補助金額?'));
-  const res = await fetch('/repay',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({advance_id:id, school_paid:school, student_council_paid:sc})});
+  const res = await fetch('/repay',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({advance_id:id, school_paid:school, student_council_paid:sc})
+  });
   const data = await res.json();
   alert(`剩餘現金: ${data.remaining_cash}`);
   loadAdvances();
 }
 
-// 用戶管理
-function showAddUserForm(){ document.getElementById('userForm').classList.remove('hidden'); }
-function cancelUserForm(){ document.getElementById('userForm').classList.add('hidden'); }
-
-async function submitUserForm(){
-  const username=document.getElementById('newUsername').value;
-  const password=document.getElementById('newPassword').value;
-  const role=document.getElementById('newRole').value;
-  const res=await fetch('/users',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username,password,role})});
-  const data=await res.json();
-  alert(data.message);
-  cancelUserForm();
-  loadUsers();
-}
-
-async function loadUsers(){
-  const res = await fetch('/users');
-  const users = await res.json();
-  const tbody = document.querySelector('#usersTable tbody');
-  tbody.innerHTML='';
-  users.forEach(u=>{
-    let ops='';
-    if(currentUser.role==='admin'){
-      ops+=`<button onclick="changePassword('${u.username}')">修改密碼</button>`;
-      if(u.username!=='admin') ops+=` <button onclick="deleteUser('${u.username}')">刪除</button>`;
-    } else if(currentUser.username===u.username){
-      ops+=`<button onclick="changePassword('${u.username}')">修改密碼</button>`;
-    }
-    tbody.innerHTML+=`<tr><td>${u.username}</td><td>${u.role}</td><td>${ops}</td></tr>`;
-  });
-  document.getElementById('showAddUserBtn').style.display = (currentUser.role==='admin')?'inline-block':'none';
-}
-
-async function deleteUser(username){
-  if(!confirm(`確定刪除 ${username}?`)) return;
-  const res=await fetch('/users/'+username,{method:'DELETE'});
-  const data=await res.json();
-  alert(data.message);
-  loadUsers();
-}
-
-async function changePassword(username){
-  const newPwd = prompt('輸入新密碼');
-  if(!newPwd) return;
-  const res = await fetch('/users/'+username+'/password',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({newPassword:newPwd})});
-  const data = await res.json();
-  alert(data.message);
-  loadUsers();
-}
-
 function logout(){ fetch('/logout',{method:'POST'}).then(()=>location.href='login.html'); }
 
-// 初始化
 loadAdvances();
-loadUsers();
 </script>
 </body>
 </html>
