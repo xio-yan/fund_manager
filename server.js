@@ -1,111 +1,141 @@
-const express = require('express');
-const session = require('express-session');
-const bodyParser = require('body-parser');
+const express = require("express");
+const bodyParser = require("body-parser");
+const session = require("express-session");
+const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 時區工具
-const nowInTaipei = () =>
-  new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+// 時區處理
+const getTaiwanTime = () => {
+  return new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
+};
 
+// 模擬資料庫
+let advances = []; // 預支紀錄
+let users = [{ username: "admin", password: "admin", role: "admin" }]; // 只留 admin
+
+// 中介軟體
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-app.use(express.static('public'));
-
 app.use(
   session({
-    secret: 'secret',
+    secret: "secret-key",
     resave: false,
     saveUninitialized: true,
   })
 );
+app.use(express.static(path.join(__dirname, "public")));
 
-// 模擬資料庫
-let advances = [];
-let users = [{ username: 'admin', password: 'admin' }];
-
-// Middleware 驗證登入
-function requireLogin(req, res, next) {
-  if (req.session.user) next();
-  else res.status(401).json({ success: false, message: '尚未登入' });
+// 登入檢查
+function checkLogin(req, res, next) {
+  if (!req.session.user) {
+    return res.redirect("/login.html");
+  }
+  next();
 }
 
-// 登入
-app.post('/login', (req, res) => {
+// ===== 路由 =====
+
+// 首頁
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// 登入頁
+app.get("/login", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "login.html"));
+});
+
+// 登入處理
+app.post("/login", (req, res) => {
   const { username, password } = req.body;
   const user = users.find(
     (u) => u.username === username && u.password === password
   );
   if (user) {
-    req.session.user = user.username;
-    res.json({ success: true });
+    req.session.user = user;
+    res.redirect("/dashboard");
   } else {
-    res.json({ success: false, message: '帳號或密碼錯誤' });
+    res.send("<script>alert('帳號或密碼錯誤');window.location='/login.html';</script>");
   }
 });
 
 // 登出
-app.post('/logout', (req, res) => {
-  req.session.destroy(() => res.json({ success: true }));
+app.get("/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.redirect("/");
+  });
 });
 
-// 新增預支（前台）
-app.post('/advances', (req, res) => {
-  const { name, activity, items } = req.body;
-  if (!name || !activity || !items || !items.length) {
-    return res.status(400).json({ success: false, message: '資料不完整' });
-  }
-  const total = items.reduce((sum, i) => sum + parseFloat(i.amount || 0), 0);
-  const newAdvance = {
+// 後台主頁
+app.get("/dashboard", checkLogin, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "dashboard.html"));
+});
+
+// API: 新增預支（前台）
+app.post("/api/advance", (req, res) => {
+  const { applicant, description, amount, source } = req.body;
+  const record = {
     id: advances.length + 1,
-    name,
-    activity,
-    items,
-    total,
-    status: '申請中',
-   申請日期: nowInTaipei(),
-    給款日期: null,
-    還款日期: null,
+    applicant,
+    description,
+    amount: Number(amount),
+    source,
+    status: "pending", // pending -> paid -> repaid
+    applyDate: getTaiwanTime(),
+    payDate: null,
+    repayDate: null,
     schoolSubsidy: 0,
-    studentSubsidy: 0,
-    cashRemaining: 0,
+    studentUnionSubsidy: 0,
+    cashReturn: 0,
   };
-  advances.push(newAdvance);
-  res.json({ success: true, message: '預支已送出', data: newAdvance });
+  advances.push(record);
+  res.json({ success: true, record });
 });
 
-// 後台：取得全部預支
-app.get('/advances', requireLogin, (req, res) => {
+// API: 取得所有預支紀錄（後台）
+app.get("/api/advances", checkLogin, (req, res) => {
   res.json(advances);
 });
 
-// 出納：已付款
-app.post('/advances/:id/pay', requireLogin, (req, res) => {
-  const adv = advances.find((a) => a.id == req.params.id);
-  if (!adv) return res.status(404).json({ success: false, message: '找不到紀錄' });
-  adv.status = '已付款';
-  adv.給款日期 = nowInTaipei();
-  res.json({ success: true, message: '已付款', data: adv });
+// API: 已付款
+app.post("/api/advance/:id/pay", checkLogin, (req, res) => {
+  const id = parseInt(req.params.id);
+  const record = advances.find((r) => r.id === id);
+  if (record && record.status === "pending") {
+    record.status = "paid";
+    record.payDate = getTaiwanTime();
+    res.json({ success: true, record });
+  } else {
+    res.status(400).json({ success: false, message: "無效操作" });
+  }
 });
 
-// 出納：還款
-app.post('/advances/:id/repay', requireLogin, (req, res) => {
-  const { schoolSubsidy, studentSubsidy } = req.body;
-  const adv = advances.find((a) => a.id == req.params.id);
-  if (!adv) return res.status(404).json({ success: false, message: '找不到紀錄' });
-  if (adv.status !== '已付款')
-    return res.status(400).json({ success: false, message: '尚未付款，不能還款' });
+// API: 還款
+app.post("/api/advance/:id/repay", checkLogin, (req, res) => {
+  const id = parseInt(req.params.id);
+  const { schoolSubsidy, studentUnionSubsidy } = req.body;
+  const record = advances.find((r) => r.id === id);
 
-  adv.schoolSubsidy = parseFloat(schoolSubsidy) || 0;
-  adv.studentSubsidy = parseFloat(studentSubsidy) || 0;
-  adv.cashRemaining = adv.total - (adv.schoolSubsidy + adv.studentSubsidy);
-  adv.status = '已還款';
-  adv.還款日期 = nowInTaipei();
+  if (record && record.status === "paid") {
+    const school = Number(schoolSubsidy) || 0;
+    const studentUnion = Number(studentUnionSubsidy) || 0;
+    const cashReturn = record.amount - school - studentUnion;
 
-  res.json({ success: true, message: '已還款完成', data: adv });
+    record.schoolSubsidy = school;
+    record.studentUnionSubsidy = studentUnion;
+    record.cashReturn = cashReturn >= 0 ? cashReturn : 0;
+    record.status = "repaid";
+    record.repayDate = getTaiwanTime();
+
+    res.json({ success: true, record });
+  } else {
+    res.status(400).json({ success: false, message: "無效操作" });
+  }
 });
 
 // 啟動伺服器
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`伺服器啟動於 http://localhost:${PORT}`);
 });
