@@ -108,3 +108,5 @@ app.get('/advances', (req,res)=>{
 
     let result = [];
     let c
+
+         
