@@ -15,6 +15,7 @@
   <h1>出納後台管理</h1>
   <button onclick="location.href='index.html'">返回首頁</button>
   <button onclick="logout()">登出</button>
+  <button onclick="changePassword()">修改密碼</button>
 
   <table id="advancesTable">
     <thead>
@@ -51,7 +52,6 @@
         `;
         tbody.appendChild(tr);
 
-        // 顯示明細
         const tr2 = document.createElement('tr');
         const td2 = document.createElement('td');
         td2.colSpan=7;
@@ -62,7 +62,6 @@
         });
         itemsHtml += '</table>';
 
-        // 取得還款歷史
         const resp = await fetch('/repayments?advance_id='+a.id);
         const repayments = await resp.json();
         let repaymentsHtml='<table class="repayments-table"><tr><th>還款日期</th><th>學校補助</th><th>學生會補助</th><th>現金剩餘</th></tr>';
@@ -104,11 +103,4 @@
     }
 
     async function logout(){
-      await fetch('/logout', { method:'POST' });
-      location.href='login.html';
-    }
-
-    loadAdvances();
-  </script>
-</body>
-</html>
+      await fetch('/logout
