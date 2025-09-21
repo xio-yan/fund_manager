@@ -17,6 +17,22 @@ app.use(session({
 const db = new sqlite3.Database('./fund.db');
 
 db.serialize(()=>{
+  // 使用者
+  db.run(`CREATE TABLE IF NOT EXISTS users (
+    username TEXT PRIMARY KEY,
+    password TEXT,
+    isAdmin INTEGER
+  )`);
+
+  // 預設使用者
+  db.get(`SELECT COUNT(*) AS cnt FROM users`, (err,row)=>{
+    if(row.cnt===0){
+      db.run(`INSERT INTO users (username,password,isAdmin) VALUES (?,?,?)`, ['admin','admin',1]);
+      db.run(`INSERT INTO users (username,password,isAdmin) VALUES (?,?,?)`, ['khuscsu','23rdkhuscsu',0]);
+    }
+  });
+
+  // 預支
   db.run(`CREATE TABLE IF NOT EXISTS advances (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
@@ -51,12 +67,17 @@ app.use(express.static('public'));
 // ===== 登入驗證 =====
 app.post('/login', (req,res)=>{
   const { username, password } = req.body;
-  if(username==='admin' && password==='admin'){
-    req.session.loggedIn = true;
-    res.send({ success:true });
-  } else {
-    res.send({ success:false });
-  }
+  db.get(`SELECT * FROM users WHERE username=?`, [username], (err,row)=>{
+    if(err) return res.status(500).send(err.message);
+    if(row && row.password===password){
+      req.session.loggedIn = true;
+      req.session.username = username;
+      req.session.isAdmin = row.isAdmin===1;
+      res.send({ success:true, isAdmin: row.isAdmin===1 });
+    } else {
+      res.send({ success:false });
+    }
+  });
 });
 
 function checkAuth(req,res,next){
@@ -71,6 +92,18 @@ app.post('/logout', (req,res)=>{
 });
 
 app.get('/dashboard.html', checkAuth, (req,res,next)=>{ next(); });
+
+// ===== 修改密碼 =====
+app.post('/changePassword', checkAuth, (req,res)=>{
+  const { targetUser, newPassword } = req.body;
+  if(targetUser!==req.session.username && !req.session.isAdmin){
+    return res.status(403).send({ message:'無權限修改其他使用者密碼' });
+  }
+  db.run(`UPDATE users SET password=? WHERE username=?`, [newPassword,targetUser], function(err){
+    if(err) return res.status(500).send(err.message);
+    res.send({ message:'修改成功' });
+  });
+});
 
 // ===== 新增預支 =====
 app.post('/advance', (req,res)=>{
