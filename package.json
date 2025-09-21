@@ -1,14 +1,13 @@
 {
-  "name": "fundapp",
+  "name": "expense-advance-system",
   "version": "1.0.0",
-  "description": "經費預支系統",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
     "express": "^4.18.2",
-    "body-parser": "^1.20.2",
-    "sqlite3": "^5.1.6",
-    "express-session": "^1.17.3"
-  },
-  "engines": { "node": ">=18.0.0" }
+    "express-session": "^1.17.3",
+    "body-parser": "^1.20.2"
+  }
 }
