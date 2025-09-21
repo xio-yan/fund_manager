@@ -64,6 +64,12 @@ function checkAuth(req,res,next){
   else res.redirect('/login.html');
 }
 
+// 登出
+app.post('/logout', (req,res)=>{
+  req.session.destroy();
+  res.send({ message:'已登出' });
+});
+
 app.get('/dashboard.html', checkAuth, (req,res,next)=>{ next(); });
 
 // ===== 新增預支 =====
