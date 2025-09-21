@@ -100,7 +100,6 @@ app.get('/advances', (req,res)=>{
         result.push({ ...a, items });
         count++;
         if(count === advances.length) {
-          // 按ID排序
           result.sort((x,y)=>x.id-y.id);
           res.send(result);
         }
@@ -129,6 +128,15 @@ app.post('/repay', (req,res)=>{
     if(err) return res.status(500).send(err.message);
     db.run(`UPDATE advances SET status='repaid' WHERE id=?`, [advance_id]);
     res.send({ message:'還款完成', remaining_cash });
+  });
+});
+
+// ===== 查詢單筆活動的還款紀錄 =====
+app.get('/repayments', (req,res)=>{
+  const advance_id = req.query.advance_id;
+  db.all(`SELECT * FROM repayments WHERE advance_id=? ORDER BY id ASC`, [advance_id], (err, rows)=>{
+    if(err) return res.status(500).send(err.message);
+    res.send(rows);
   });
 });
 
