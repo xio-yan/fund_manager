@@ -7,6 +7,8 @@
     th { background-color:#f2f2f2; }
     .items-table { margin-top:5px; margin-bottom:10px; }
     .items-table th { background-color:#ddd; }
+    .repayments-table { margin-top:5px; margin-bottom:10px; }
+    .repayments-table th { background-color:#cfc; }
   </style>
 </head>
 <body>
@@ -31,7 +33,7 @@
       const tbody = document.querySelector('#advancesTable tbody');
       tbody.innerHTML='';
 
-      advances.forEach(a=>{
+      for(const a of advances){
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${a.id}</td>
@@ -47,19 +49,35 @@
         `;
         tbody.appendChild(tr);
 
-        // 顯示細項
+        // 顯示明細
         const tr2 = document.createElement('tr');
         const td2 = document.createElement('td');
         td2.colSpan=7;
+
         let itemsHtml='<table class="items-table"><tr><th>用途</th><th>金額</th><th>來源</th></tr>';
         a.items.forEach(i=>{
           itemsHtml += `<tr><td>${i.description}</td><td>${i.amount}</td><td>${i.source==='school'?'學校':'學生會'}</td></tr>`;
         });
         itemsHtml += '</table>';
-        td2.innerHTML = itemsHtml;
+
+        // 取得還款歷史
+        const resp = await fetch('/repayments?advance_id='+a.id);
+        const repayments = await resp.json();
+        let repaymentsHtml='<table class="repayments-table"><tr><th>還款日期</th><th>學校補助</th><th>學生會補助</th><th>現金剩餘</th></tr>';
+        repayments.forEach(r=>{
+          repaymentsHtml += `<tr>
+            <td>${r.repayment_date}</td>
+            <td>${r.school_paid}</td>
+            <td>${r.student_council_paid}</td>
+            <td>${r.remaining_cash}</td>
+          </tr>`;
+        });
+        repaymentsHtml += '</table>';
+
+        td2.innerHTML = itemsHtml + repaymentsHtml;
         tr2.appendChild(td2);
         tbody.appendChild(tr2);
-      });
+      }
     }
 
     async function markPaid(id){
