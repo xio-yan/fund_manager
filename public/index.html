@@ -54,7 +54,7 @@
         body: JSON.stringify({name: formData.get('name'), activity: formData.get('activity'), items})
       }).then(res=>res.json()).then(data=>{
         alert(JSON.stringify(data));
-        e.target.reset(); // 送出後清空表單
+        e.target.reset();
         document.getElementById('items').innerHTML = `<div>
           用途: <input type="text" name="description[]" required>
           金額: <input type="number" name="amount[]" required>
