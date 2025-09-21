@@ -6,12 +6,12 @@
 <body>
   <h1>新增預支</h1>
   <form id="advanceForm">
-    姓名: <input type="text" name="name"><br>
-    活動名稱: <input type="text" name="activity"><br>
+    姓名: <input type="text" name="name" required><br>
+    活動名稱: <input type="text" name="activity" required><br>
     <div id="items">
       <div>
-        用途: <input type="text" name="description[]">
-        金額: <input type="number" name="amount[]">
+        用途: <input type="text" name="description[]" required>
+        金額: <input type="number" name="amount[]" required>
         來源:
         <select name="source[]">
           <option value="school">學校</option>
@@ -19,15 +19,22 @@
         </select>
       </div>
     </div>
-    <button type="button" onclick="addItem()">新增用途</button><br>
+    <button type="button" onclick="addItem()">新增用途</button><br><br>
     <button type="submit">送出</button>
   </form>
+
+  <hr>
+  <button onclick="window.location.href='/login.html'">前往後台</button>
 
   <script>
     function addItem() {
       const div = document.createElement('div');
-      div.innerHTML = `用途: <input type="text" name="description[]"> 金額: <input type="number" name="amount[]"> 來源: 
-      <select name="source[]"><option value="school">學校</option><option value="student_council">學生會</option></select>`;
+      div.innerHTML = `用途: <input type="text" name="description[]" required>
+        金額: <input type="number" name="amount[]" required>
+        來源: <select name="source[]">
+          <option value="school">學校</option>
+          <option value="student_council">學生會</option>
+        </select>`;
       document.getElementById('items').appendChild(div);
     }
 
@@ -45,7 +52,19 @@
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({name: formData.get('name'), activity: formData.get('activity'), items})
-      }).then(res=>res.json()).then(data=>alert(JSON.stringify(data)));
+      }).then(res=>res.json()).then(data=>{
+        alert(JSON.stringify(data));
+        e.target.reset(); // 送出後清空表單
+        document.getElementById('items').innerHTML = `<div>
+          用途: <input type="text" name="description[]" required>
+          金額: <input type="number" name="amount[]" required>
+          來源:
+          <select name="source[]">
+            <option value="school">學校</option>
+            <option value="student_council">學生會</option>
+          </select>
+        </div>`;
+      });
     });
   </script>
 </body>
