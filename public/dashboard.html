@@ -1,20 +1,45 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>出納後台</title>
+  <title>出納後台管理</title>
   <style>
     table, th, td { border:1px solid black; border-collapse: collapse; padding:5px; }
     th { background-color:#f2f2f2; }
     .items-table, .repayments-table { margin-top:5px; margin-bottom:10px; width: 90%; }
     .items-table th, .repayments-table th { background-color:#ddd; }
+    #userForm { margin-bottom:20px; border:1px solid #ccc; padding:10px; width:400px; }
   </style>
 </head>
 <body>
   <h1>出納後台管理</h1>
   <button onclick="location.href='index.html'">返回首頁</button>
   <button onclick="logout()">登出</button>
-  <button onclick="changePassword()">修改密碼</button>
 
+  <h2>用戶管理</h2>
+  <div id="userForm" style="display:none;">
+    <h3 id="userFormTitle">新增使用者</h3>
+    <label>帳號: <input type="text" id="newUsername"></label><br><br>
+    <label>密碼: <input type="password" id="newPassword"></label><br><br>
+    <label>權限: 
+      <select id="newRole">
+        <option value="admin">admin</option>
+        <option value="manager">管理員</option>
+      </select>
+    </label><br><br>
+    <button onclick="submitUserForm()">確認</button>
+    <button onclick="cancelUserForm()">取消</button>
+  </div>
+
+  <button id="showAddUserBtn" onclick="showAddUserForm()">新增使用者</button>
+
+  <table id="usersTable">
+    <thead>
+      <tr><th>帳號</th><th>權限</th><th>操作</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>預支管理</h2>
   <table id="advancesTable">
     <thead>
       <tr>
@@ -25,112 +50,187 @@
     <tbody></tbody>
   </table>
 
-  <script>
-    let advances = [];
+<script>
+let users = [];
+let editingUser = null;
+let currentUserRole = sessionStorage.getItem('role') || 'manager'; // 登入者權限
 
-    async function loadAdvances(){
-      try {
-        const res = await fetch('/advances');
-        advances = await res.json();
-        const tbody = document.querySelector('#advancesTable tbody');
-        tbody.innerHTML='';
-
-        for(const a of advances){
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${a.id}</td>
-            <td>${a.name}</td>
-            <td>${a.activity}</td>
-            <td>${a.apply_date}</td>
-            <td>${a.total_amount}</td>
-            <td>${a.status}</td>
-            <td>
-              ${a.status==='pending'?`<button onclick="markPaid(${a.id})">標記給款</button>`:''}
-              ${a.status==='paid'?`<button onclick="repay(${a.id})">登記還款</button>`:''}
-            </td>
-          `;
-          tbody.appendChild(tr);
-
-          // 預支明細
-          const tr2 = document.createElement('tr');
-          const td2 = document.createElement('td');
-          td2.colSpan = 7;
-
-          let itemsHtml = '<b>預支明細：</b><table class="items-table"><tr><th>用途</th><th>金額</th><th>來源</th></tr>';
-          a.items.forEach(i=>{
-            itemsHtml += `<tr><td>${i.description}</td><td>${i.amount}</td><td>${i.source==='school'?'學校':'學生會'}</td></tr>`;
-          });
-          itemsHtml += '</table>';
-
-          // 還款紀錄
-          const resp = await fetch('/repayments?advance_id='+a.id);
-          const repayments = await resp.json();
-          let repaymentsHtml = '<b>還款紀錄：</b><table class="repayments-table"><tr><th>還款日期</th><th>學校補助</th><th>學生會補助</th><th>現金剩餘</th></tr>';
-          repayments.forEach(r=>{
-            repaymentsHtml += `<tr>
-              <td>${r.repayment_date}</td>
-              <td>${r.school_paid}</td>
-              <td>${r.student_council_paid}</td>
-              <td>${r.remaining_cash}</td>
-            </tr>`;
-          });
-          repaymentsHtml += '</table>';
-
-          td2.innerHTML = itemsHtml + repaymentsHtml;
-          tr2.appendChild(td2);
-          tbody.appendChild(tr2);
-        }
-
-      } catch(err){
-        console.error('載入預支資料錯誤:', err);
-      }
+// ---------- 用戶管理 ----------
+async function loadUsers(){
+  const res = await fetch('/users');
+  users = await res.json();
+  const tbody = document.querySelector('#usersTable tbody');
+  tbody.innerHTML = '';
+  users.forEach(u=>{
+    const tr = document.createElement('tr');
+    let ops = `<button onclick="showChangePasswordForm('${u.username}')">修改密碼</button>`;
+    if(currentUserRole==='admin' && u.username!=='admin'){ // admin可以刪除其他人
+      ops += ` <button onclick="deleteUser('${u.username}')">刪除</button>`;
     }
+    tr.innerHTML = `<td>${u.username}</td><td>${u.role}</td><td>${ops}</td>`;
+    tbody.appendChild(tr);
+  });
 
-    async function markPaid(id){
-      try{
-        await fetch('/markPaid/'+id, { method:'POST' });
-        loadAdvances();
-      } catch(err){ console.error(err); }
-    }
+  // 顯示新增使用者按鈕（admin才可）
+  document.getElementById('showAddUserBtn').style.display = (currentUserRole==='admin')?'inline-block':'none';
+}
 
-    async function repay(id){
-      try{
-        const advance = advances.find(a=>a.id===id);
-        let school_paid = parseFloat(prompt('輸入學校補助金額', 0));
-        let student_council_paid = parseFloat(prompt('輸入學生會補助金額', 0));
-        let remaining_cash = advance.total_amount - school_paid - student_council_paid;
-        if(remaining_cash<0) { alert('補助金額超過總金額'); return; }
-        if(!confirm(`剩餘現金: ${remaining_cash} 元，確認已收現金嗎？`)) return;
+function showAddUserForm(){
+  editingUser = null;
+  document.getElementById('userFormTitle').innerText = '新增使用者';
+  document.getElementById('newUsername').value='';
+  document.getElementById('newPassword').value='';
+  document.getElementById('newRole').value='manager';
+  document.getElementById('userForm').style.display='block';
+}
 
-        await fetch('/repay',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ advance_id:id, school_paid, student_council_paid, remaining_cash })
-        });
-        loadAdvances();
-      } catch(err){ console.error(err); }
-    }
+function showChangePasswordForm(username){
+  editingUser = username;
+  document.getElementById('userFormTitle').innerText = `修改 ${username} 密碼`;
+  document.getElementById('newUsername').value=username;
+  document.getElementById('newUsername').disabled=true;
+  document.getElementById('newPassword').value='';
+  document.getElementById('newRole').style.display='none';
+  document.getElementById('userForm').style.display='block';
+}
 
-    async function logout(){
-      await fetch('/logout',{ method:'POST' });
-      location.href='index.html';
-    }
+function cancelUserForm(){
+  document.getElementById('userForm').style.display='none';
+  document.getElementById('newUsername').disabled=false;
+  document.getElementById('newRole').style.display='inline-block';
+}
 
-    async function changePassword(){
-      const targetUser = prompt('輸入要修改密碼的使用者名稱', sessionStorage.getItem('username'));
-      const newPassword = prompt('輸入新密碼');
-      if(!newPassword) return;
-      const res = await fetch('/changePassword', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ targetUser, newPassword })
+async function submitUserForm(){
+  const username = document.getElementById('newUsername').value.trim();
+  const password = document.getElementById('newPassword').value.trim();
+  const role = document.getElementById('newRole').value;
+  if(!username || !password) { alert('帳號或密碼不可空'); return; }
+
+  if(editingUser){ // 修改密碼
+    const res = await fetch('/users/'+username+'/password',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ newPassword: password })
+    });
+    const data = await res.json();
+    alert(data.message);
+  } else { // 新增使用者
+    const res = await fetch('/users',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username, password, role })
+    });
+    const data = await res.json();
+    alert(data.message);
+  }
+
+  cancelUserForm();
+  loadUsers();
+}
+
+async function deleteUser(username){
+  if(!confirm(`確認刪除使用者 ${username} ?`)) return;
+  const res = await fetch('/users/'+username, { method:'DELETE' });
+  const data = await res.json();
+  alert(data.message);
+  loadUsers();
+}
+
+// ---------- 預支管理 ----------
+let advances = [];
+
+async function loadAdvances(){
+  try {
+    const res = await fetch('/advances');
+    advances = await res.json();
+    const tbody = document.querySelector('#advancesTable tbody');
+    tbody.innerHTML='';
+
+    for(const a of advances){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${a.id}</td>
+        <td>${a.name}</td>
+        <td>${a.activity}</td>
+        <td>${a.apply_date}</td>
+        <td>${a.total_amount}</td>
+        <td>${a.status}</td>
+        <td>
+          ${a.status==='pending'?`<button onclick="markPaid(${a.id})">標記給款</button>`:''}
+          ${a.status==='paid'?`<button onclick="repay(${a.id})">登記還款</button>`:''}
+        </td>
+      `;
+      tbody.appendChild(tr);
+
+      // 預支明細
+      const tr2 = document.createElement('tr');
+      const td2 = document.createElement('td');
+      td2.colSpan = 7;
+
+      let itemsHtml = '<b>預支明細：</b><table class="items-table"><tr><th>用途</th><th>金額</th><th>來源</th></tr>';
+      a.items.forEach(i=>{
+        itemsHtml += `<tr><td>${i.description}</td><td>${i.amount}</td><td>${i.source==='school'?'學校':'學生會'}</td></tr>`;
       });
-      const data = await res.json();
-      alert(data.message);
-      loadAdvances();
+      itemsHtml += '</table>';
+
+      // 還款紀錄
+      const resp = await fetch('/repayments?advance_id='+a.id);
+      const repayments = await resp.json();
+      let repaymentsHtml = '<b>還款紀錄：</b><table class="repayments-table"><tr><th>還款日期</th><th>學校補助</th><th>學生會補助</th><th>現金剩餘</th></tr>';
+      repayments.forEach(r=>{
+        repaymentsHtml += `<tr>
+          <td>${r.repayment_date}</td>
+          <td>${r.school_paid}</td>
+          <td>${r.student_council_paid}</td>
+          <td>${r.remaining_cash}</td>
+        </tr>`;
+      });
+      repaymentsHtml += '</table>';
+
+      td2.innerHTML = itemsHtml + repaymentsHtml;
+      tr2.appendChild(td2);
+      tbody.appendChild(tr2);
     }
 
+  } catch(err){
+    console.error('載入預支資料錯誤:', err);
+  }
+}
+
+async function markPaid(id){
+  try{
+    await fetch('/markPaid/'+id, { method:'POST' });
     loadAdvances();
-  </script>
+  } catch(err){ console.error(err); }
+}
+
+async function repay(id){
+  try{
+    const advance = advances.find(a=>a.id===id);
+    let school_paid = parseFloat(prompt('輸入學校補助金額', 0));
+    let student_council_paid = parseFloat(prompt('輸入學生會補助金額', 0));
+    let remaining_cash = advance.total_amount - school_paid - student_council_paid;
+    if(remaining_cash<0) { alert('補助金額超過總金額'); return; }
+    if(!confirm(`剩餘現金: ${remaining_cash} 元，確認已收現金嗎？`)) return;
+
+    await fetch('/repay',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ advance_id:id, school_paid, student_council_paid, remaining_cash })
+    });
+    loadAdvances();
+  } catch(err){ console.error(err); }
+}
+
+// ---------- 登出 ----------
+async function logout(){
+  await fetch('/logout',{ method:'POST' });
+  location.href='index.html';
+}
+
+// ---------- 初始化 ----------
+loadUsers();
+loadAdvances();
+</script>
 </body>
 </html>
