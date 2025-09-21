@@ -3,112 +3,87 @@
 <head>
   <meta charset="UTF-8">
   <title>後台管理</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h1 { display: inline-block; }
-    .user-info { float: right; font-weight: bold; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background: #f2f2f2; }
-    button { margin: 2px; padding: 5px 10px; }
-  </style>
 </head>
 <body>
   <h1>後台管理</h1>
-  <div class="user-info">
-    登入使用者：<span id="currentUser"></span> |
-    <a href="/logout">登出</a> |
-    <a href="/">返回首頁</a>
-  </div>
+  <div id="currentUser"></div>
+  <button onclick="logout()">登出</button>
+  <a href="/">返回首頁</a>
 
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>申請人</th>
-        <th>用途</th>
-        <th>金額</th>
-        <th>來源</th>
-        <th>申請日期</th>
-        <th>給款日期</th>
-        <th>還款日期</th>
-        <th>學校補助</th>
-        <th>學生會補助</th>
-        <th>應還現金</th>
-        <th>狀態</th>
-        <th>操作</th>
-      </tr>
-    </thead>
-    <tbody id="recordsBody">
-    </tbody>
-  </table>
+  <h2>活動與款項</h2>
+  <div id="activities"></div>
 
   <script>
-    async function fetchRecords() {
-      const res = await fetch('/api/advances');
-      const records = await res.json();
-      const tbody = document.getElementById('recordsBody');
-      tbody.innerHTML = '';
-
-      records.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${r.id}</td>
-          <td>${r.applicant}</td>
-          <td>${r.description}</td>
-          <td>${r.amount}</td>
-          <td>${r.source}</td>
-          <td>${r.applyDate || ''}</td>
-          <td>${r.payDate || ''}</td>
-          <td>${r.repayDate || ''}</td>
-          <td>${r.schoolSubsidy}</td>
-          <td>${r.studentUnionSubsidy}</td>
-          <td>${r.cashReturn}</td>
-          <td>${r.status}</td>
-          <td>
-            ${r.status === 'pending' ? `<button onclick="markPaid(${r.id})">已付款</button>` : ''}
-            ${r.status === 'paid' ? `<button onclick="markRepaid(${r.id})">還款</button>` : ''}
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    async function markPaid(id) {
-      if (!confirm("確認這筆款項已付款？")) return;
-      await fetch(`/api/advance/${id}/pay`, { method: 'POST' });
-      fetchRecords();
-    }
-
-    async function markRepaid(id) {
-      const school = prompt("請輸入學校補助金額：", "0");
-      if (school === null) return;
-
-      const union = prompt("請輸入學生會補助金額：", "0");
-      if (union === null) return;
-
-      const res = await fetch(`/api/advance/${id}/repay`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schoolSubsidy: school, studentUnionSubsidy: union })
-      });
+    async function loadCurrentUser() {
+      const res = await fetch("/api/current-user");
       const data = await res.json();
-      if (data.success) {
-        alert(`還款完成，應還現金：${data.record.cashReturn} 元`);
+      if (data.username) {
+        document.getElementById("currentUser").innerText = "目前登入：" + data.username;
       } else {
-        alert("操作失敗：" + data.message);
+        window.location.href = "/login.html";
       }
-      fetchRecords();
     }
 
-    async function fetchCurrentUser() {
-      const res = await fetch('/api/current-user');
-      const data = await res.json();
-      document.getElementById('currentUser').innerText = data.username || '未知';
+    async function loadActivities() {
+      const res = await fetch("/api/activities");
+      const activities = await res.json();
+      const container = document.getElementById("activities");
+      container.innerHTML = "";
+      activities.forEach(act => {
+        const div = document.createElement("div");
+        div.innerHTML = `<h3>${act.name} - 申請人：${act.applicant} (${act.applyDate})</h3>`;
+        const table = document.createElement("table");
+        table.border = 1;
+        table.innerHTML = `<tr>
+          <th>用途</th><th>金額</th><th>來源</th><th>狀態</th><th>申請日</th><th>給款日</th><th>還款日</th><th>操作</th>
+        </tr>`;
+        act.items.forEach(item => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${item.description}</td>
+            <td>${item.amount}</td>
+            <td>${item.source}</td>
+            <td>${item.status}</td>
+            <td>${item.applyDate}</td>
+            <td>${item.payDate || ""}</td>
+            <td>${item.repayDate || ""}</td>
+            <td>
+              ${item.status === "申請中" ? `<button onclick="pay(${act.id},${item.id})">已付款</button>` : ""}
+              ${item.status === "已付款" ? `<button onclick="repayPrompt(${act.id},${item.id})">還款</button>` : ""}
+            </td>
+          `;
+          table.appendChild(tr);
+        });
+        div.appendChild(table);
+        container.appendChild(div);
+      });
     }
 
-    fetchRecords();
-    fetchCurrentUser();
+    async function pay(activityId, itemId) {
+      await fetch(`/api/activity/${activityId}/item/${itemId}/pay`, { method: "POST" });
+      loadActivities();
+    }
+
+    async function repayPrompt(activityId, itemId) {
+      const schoolSubsidy = prompt("輸入學校補助金額：", "0");
+      const studentUnionSubsidy = prompt("輸入學生會補助金額：", "0");
+      if (schoolSubsidy !== null && studentUnionSubsidy !== null) {
+        await fetch(`/api/activity/${activityId}/item/${itemId}/repay`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ schoolSubsidy, studentUnionSubsidy })
+        });
+        loadActivities();
+      }
+    }
+
+    async function logout() {
+      await fetch("/logout");
+      window.location.href = "/login.html";
+    }
+
+    loadCurrentUser();
+    loadActivities();
   </script>
 </body>
 </html>
