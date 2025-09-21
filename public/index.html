@@ -2,49 +2,73 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>經費預支申請</title>
+<title>預支申請</title>
+<style>.hidden{display:none;}</style>
 </head>
 <body>
-<h1>預支申請表</h1>
-<label>姓名: <input id="name"></label><br>
-<label>活動: <input id="activity"></label><br>
+<h1>經費預支申請</h1>
 
-<div id="itemsContainer"><h3>項目</h3></div>
-<button onclick="addItem()">新增項目</button><br><br>
+<label>姓名: <input id="name"></label><br>
+<label>活動名稱: <input id="activity"></label><br>
+
+<h3>用途款項</h3>
+<div id="itemsContainer"></div>
+<button onclick="addItem()">新增一筆用途</button><br><br>
 
 <button onclick="submitAdvance()">送出預支</button>
-<button onclick="location.href='login.html'">前往後台</button>
+<button onclick="location.href='login.html'">後台登入</button>
 
 <script>
-function addItem(){
-  const container = document.getElementById('itemsContainer');
+function addItem(desc='', amt='', source='school'){
   const div = document.createElement('div');
-  div.innerHTML = `
-    項目名稱: <input class="itemName">
-    金額: <input type="number" class="itemAmount">
-    來源: <select class="itemSource"><option value="school">學校</option><option value="student_council">學生會</option></select>
-    <button onclick="this.parentNode.remove()">刪除</button>
+  div.classList.add('item');
+  div.innerHTML=`
+    說明: <input class="desc" value="${desc}"> 
+    金額: <input class="amount" type="number" value="${amt}"> 
+    來源: 
+    <select class="source">
+      <option value="school" ${source==='school'?'selected':''}>學校</option>
+      <option value="student" ${source==='student'?'selected':''}>學生會</option>
+    </select>
+    <button type="button" onclick="this.parentElement.remove()">刪除</button>
+    <br><br>
   `;
-  container.appendChild(div);
+  document.getElementById('itemsContainer').appendChild(div);
 }
+
+// 預設先一筆
+addItem();
 
 async function submitAdvance(){
   const name = document.getElementById('name').value;
   const activity = document.getElementById('activity').value;
-  const itemsDivs = document.querySelectorAll('#itemsContainer > div');
-  const items = Array.from(itemsDivs).map(d=>({
-    name:d.querySelector('.itemName').value,
-    amount: parseFloat(d.querySelector('.itemAmount').value),
-    source: d.querySelector('.itemSource').value
-  }));
-  if(!name || !activity || items.length===0){ alert('資料不完整'); return; }
-  const res = await fetch('/advances',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name,activity,items})});
+  if(!name || !activity){ alert('請填寫姓名與活動名稱'); return; }
+
+  const itemsDivs = document.querySelectorAll('#itemsContainer .item');
+  if(itemsDivs.length===0){ alert('請新增至少一筆用途'); return; }
+
+  const items = [];
+  for(const d of itemsDivs){
+    const description = d.querySelector('.desc').value;
+    const amount = parseFloat(d.querySelector('.amount').value);
+    const source = d.querySelector('.source').value;
+    if(!description || isNaN(amount)){ alert('用途說明與金額不可空白'); return; }
+    items.push({description, amount, source});
+  }
+
+  const res = await fetch('/advances',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, activity, items})
+  });
   const data = await res.json();
   alert(data.message);
+
   // 清空表單
   document.getElementById('name').value='';
   document.getElementById('activity').value='';
-  document.getElementById('itemsContainer').innerHTML='<h3>項目</h3>';
+  document.getElementById('itemsContainer').innerHTML='';
+  addItem();
 }
 </script>
 </body>
