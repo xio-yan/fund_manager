@@ -7,7 +7,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public')); // 放前端頁面
 
-// 預支新增
+// ================== 新增預支 ==================
 app.post('/advance', (req, res) => {
   const { name, activity, items } = req.body;
   const apply_date = new Date().toISOString().split('T')[0];
@@ -35,7 +35,7 @@ app.post('/advance', (req, res) => {
   });
 });
 
-// 查詢所有預支
+// ================== 查詢所有預支 ==================
 app.get('/advances', (req, res) => {
   db.all(`SELECT * FROM advances`, (err, rows) => {
     if(err) return res.status(500).send(err.message);
@@ -43,7 +43,16 @@ app.get('/advances', (req, res) => {
   });
 });
 
-// 還款紀錄
+// ================== 標記已給款 ==================
+app.post('/markPaid/:id', (req, res) => {
+  const id = req.params.id;
+  db.run(`UPDATE advances SET status='paid' WHERE id=?`, [id], function(err){
+    if(err) return res.status(500).send(err.message);
+    res.send({ message: '已標記給款' });
+  });
+});
+
+// ================== 登記還款 ==================
 app.post('/repay', (req, res) => {
   const { advance_id, school_paid, student_council_paid } = req.body;
   const repayment_date = new Date().toISOString().split('T')[0];
@@ -61,7 +70,7 @@ app.post('/repay', (req, res) => {
   });
 });
 
-// 啟動伺服器
+// ================== 啟動伺服器 ==================
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log('Server running on port ' + listener.address().port);
 });
