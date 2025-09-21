@@ -1,116 +1,118 @@
 const express = require("express");
 const session = require("express-session");
 const bodyParser = require("body-parser");
-const path = require("path");
-
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = 3000;
+
+// 時區設定
+const tz = "Asia/Taipei";
 
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static("public"));
+app.use(session({
+  secret: "secret",
+  resave: false,
+  saveUninitialized: true
+}));
 
-app.use(
-  session({
-    secret: "secret-key",
-    resave: false,
-    saveUninitialized: true,
-  })
-);
+let activities = []; // 活動資料
+let activityId = 1;
 
-// 模擬資料庫
-let activities = []; // 活動，每個活動可有多筆款項
-let adminUser = { username: "admin", password: "admin" };
+// 預設帳號
+const adminAccount = { username: "admin", password: "admin" };
+
+// 登入頁
+app.get("/login.html", (req, res) => {
+  res.sendFile(__dirname + "/public/login.html");
+});
 
 // 登入 API
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
-  if (username === adminUser.username && password === adminUser.password) {
-    req.session.user = { username };
+  if (username === adminAccount.username && password === adminAccount.password) {
+    req.session.user = username;
     res.json({ success: true });
   } else {
-    res.json({ success: false, message: "帳號或密碼錯誤" });
+    res.json({ success: false });
   }
 });
 
-// 登出 API
-app.get("/logout", (req, res) => {
-  req.session.destroy(() => {
-    res.redirect("/");
-  });
-});
-
-// 取得目前登入使用者
+// 取得目前使用者
 app.get("/api/current-user", (req, res) => {
-  if (req.session.user) {
-    res.json({ username: req.session.user.username });
-  } else {
-    res.json({ username: null });
-  }
+  res.json({ username: req.session.user });
 });
 
-// 前台：新增活動及款項（不用登入）
+// 登出
+app.get("/logout", (req, res) => {
+  req.session.destroy();
+  res.json({ success: true });
+});
+
+// 新增活動（前台，不需要登入）
 app.post("/api/activity", (req, res) => {
   const { applicant, activityName, items } = req.body;
-  if (!applicant || !activityName || !items || !Array.isArray(items)) {
-    return res.json({ success: false, message: "資料不完整" });
-  }
+  const now = new Date().toLocaleString("zh-TW", { timeZone: tz });
   const newActivity = {
-    id: activities.length + 1,
+    id: activityId++,
     applicant,
     name: activityName,
-    applyDate: new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" }),
+    applyDate: now,
     items: items.map((it, idx) => ({
       id: idx + 1,
       description: it.description,
-      amount: parseInt(it.amount),
+      amount: Number(it.amount),
       source: it.source,
       status: "申請中",
+      applyDate: now,
       payDate: null,
       repayDate: null,
       schoolSubsidy: 0,
       studentUnionSubsidy: 0,
-      cashReturn: 0,
-    })),
+      cashReturn: 0
+    }))
   };
   activities.push(newActivity);
-  res.json({ success: true, activity: newActivity });
+  res.json({ success: true });
 });
 
-// 後台：取得所有活動
+// 後台取得所有活動（需登入 admin）
 app.get("/api/activities", (req, res) => {
-  if (!req.session.user) return res.status(401).json({ success: false });
+  if (req.session.user !== "admin") return res.status(401).json({ error: "未登入" });
   res.json(activities);
 });
 
-// 後台：標記已付款
-app.post("/api/activity/:activityId/item/:itemId/pay", (req, res) => {
-  if (!req.session.user) return res.status(401).json({ success: false });
-  const activity = activities.find(a => a.id == req.params.activityId);
-  if (!activity) return res.json({ success: false });
-  const item = activity.items.find(i => i.id == req.params.itemId);
-  if (!item || item.status !== "申請中") return res.json({ success: false });
-  item.status = "已付款";
-  item.payDate = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
-  res.json({ success: true, item });
+// 活動給款（整個活動為單位）
+app.post("/api/activity/:id/pay", (req, res) => {
+  if (req.session.user !== "admin") return res.status(401).json({ error: "未登入" });
+  const act = activities.find(a => a.id == req.params.id);
+  if (!act) return res.status(404).json({ error: "找不到活動" });
+  const now = new Date().toLocaleString("zh-TW", { timeZone: tz });
+  act.items.forEach(item => {
+    item.status = "已付款";
+    item.payDate = now;
+  });
+  res.json({ success: true });
 });
 
-// 後台：還款
-app.post("/api/activity/:activityId/item/:itemId/repay", (req, res) => {
-  if (!req.session.user) return res.status(401).json({ success: false });
-  const activity = activities.find(a => a.id == req.params.activityId);
-  if (!activity) return res.json({ success: false });
-  const item = activity.items.find(i => i.id == req.params.itemId);
-  if (!item || item.status !== "已付款") return res.json({ success: false });
+// 活動還款（整個活動為單位）
+app.post("/api/activity/:id/repay", (req, res) => {
+  if (req.session.user !== "admin") return res.status(401).json({ error: "未登入" });
   const { schoolSubsidy, studentUnionSubsidy } = req.body;
-  item.schoolSubsidy = parseInt(schoolSubsidy);
-  item.studentUnionSubsidy = parseInt(studentUnionSubsidy);
-  item.cashReturn = item.amount - item.schoolSubsidy - item.studentUnionSubsidy;
-  item.status = "已還款";
-  item.repayDate = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
-  res.json({ success: true, item });
+  const act = activities.find(a => a.id == req.params.id);
+  if (!act) return res.status(404).json({ error: "找不到活動" });
+  const now = new Date().toLocaleString("zh-TW", { timeZone: tz });
+  const total = act.items.reduce((sum, it) => sum + it.amount, 0);
+  const school = Number(schoolSubsidy);
+  const student = Number(studentUnionSubsidy);
+  const cashReturn = total - school - student;
+  act.items.forEach(item => {
+    item.status = "已還款";
+    item.repayDate = now;
+    item.schoolSubsidy = school;
+    item.studentUnionSubsidy = student;
+    item.cashReturn = cashReturn;
+  });
+  res.json({ success: true });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
