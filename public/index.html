@@ -1,71 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>實踐大學高雄校區學生會經費預支系統</title>
+<meta charset="UTF-8">
+<title>經費預支申請</title>
 </head>
 <body>
-  <h1>實踐大學高雄校區學生會 新增預支</h1>
-  <form id="advanceForm">
-    姓名: <input type="text" name="name" required><br>
-    活動名稱: <input type="text" name="activity" required><br>
-    <div id="items">
-      <div>
-        用途: <input type="text" name="description[]" required>
-        金額: <input type="number" name="amount[]" required>
-        來源:
-        <select name="source[]">
-          <option value="school">學校</option>
-          <option value="student_council">學生會</option>
-        </select>
-      </div>
-    </div>
-    <button type="button" onclick="addItem()">新增用途</button><br><br>
-    <button type="submit">送出</button>
-  </form>
+<h1>預支申請表</h1>
+<label>姓名: <input id="name"></label><br>
+<label>活動: <input id="activity"></label><br>
 
-  <hr>
-  <button onclick="window.location.href='/login.html'">前往後台</button>
+<div id="itemsContainer"><h3>項目</h3></div>
+<button onclick="addItem()">新增項目</button><br><br>
 
-  <script>
-    function addItem() {
-      const div = document.createElement('div');
-      div.innerHTML = `用途: <input type="text" name="description[]" required>
-        金額: <input type="number" name="amount[]" required>
-        來源: <select name="source[]">
-          <option value="school">學校</option>
-          <option value="student_council">學生會</option>
-        </select>`;
-      document.getElementById('items').appendChild(div);
-    }
+<button onclick="submitAdvance()">送出預支</button>
+<button onclick="location.href='login.html'">前往後台</button>
 
-    document.getElementById('advanceForm').addEventListener('submit', function(e){
-      e.preventDefault();
-      const formData = new FormData(e.target);
-      const items = [];
-      const descriptions = formData.getAll('description[]');
-      const amounts = formData.getAll('amount[]');
-      const sources = formData.getAll('source[]');
-      for(let i=0;i<descriptions.length;i++){
-        items.push({description: descriptions[i], amount: parseFloat(amounts[i]), source: sources[i]});
-      }
-      fetch('/advance', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({name: formData.get('name'), activity: formData.get('activity'), items})
-      }).then(res=>res.json()).then(data=>{
-        alert(JSON.stringify(data));
-        e.target.reset();
-        document.getElementById('items').innerHTML = `<div>
-          用途: <input type="text" name="description[]" required>
-          金額: <input type="number" name="amount[]" required>
-          來源:
-          <select name="source[]">
-            <option value="school">學校</option>
-            <option value="student_council">學生會</option>
-          </select>
-        </div>`;
-      });
-    });
-  </script>
+<script>
+function addItem(){
+  const container = document.getElementById('itemsContainer');
+  const div = document.createElement('div');
+  div.innerHTML = `
+    項目名稱: <input class="itemName">
+    金額: <input type="number" class="itemAmount">
+    來源: <select class="itemSource"><option value="school">學校</option><option value="student_council">學生會</option></select>
+    <button onclick="this.parentNode.remove()">刪除</button>
+  `;
+  container.appendChild(div);
+}
+
+async function submitAdvance(){
+  const name = document.getElementById('name').value;
+  const activity = document.getElementById('activity').value;
+  const itemsDivs = document.querySelectorAll('#itemsContainer > div');
+  const items = Array.from(itemsDivs).map(d=>({
+    name:d.querySelector('.itemName').value,
+    amount: parseFloat(d.querySelector('.itemAmount').value),
+    source: d.querySelector('.itemSource').value
+  }));
+  if(!name || !activity || items.length===0){ alert('資料不完整'); return; }
+  const res = await fetch('/advances',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name,activity,items})});
+  const data = await res.json();
+  alert(data.message);
+  // 清空表單
+  document.getElementById('name').value='';
+  document.getElementById('activity').value='';
+  document.getElementById('itemsContainer').innerHTML='<h3>項目</h3>';
+}
+</script>
 </body>
 </html>
