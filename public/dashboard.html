@@ -3,7 +3,7 @@
 <head>
   <title>出納後台</title>
   <style>
-    table, th, td { border: 1px solid black; border-collapse: collapse; padding: 5px; }
+    table, th, td { border: 1px solid black; border-collapse: collapse; padding:5px; }
     th { background-color: #f2f2f2; }
   </style>
 </head>
@@ -31,18 +31,16 @@
   <p id="stats"></p>
 
   <script>
-    async function loadAdvances() {
+    async function loadAdvances(){
       const res = await fetch('/advances');
       const advances = await res.json();
       const tbody = document.querySelector('#advancesTable tbody');
       tbody.innerHTML = '';
 
-      let schoolTotal = 0;
-      let studentTotal = 0;
-
-      advances.forEach(a => {
-        schoolTotal += a.school_amount;
-        studentTotal += a.student_council_amount;
+      let schoolTotal=0, studentTotal=0;
+      advances.forEach(a=>{
+        schoolTotal+=a.school_amount;
+        studentTotal+=a.student_council_amount;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -55,29 +53,29 @@
           <td>${a.student_council_amount}</td>
           <td>${a.status}</td>
           <td>
-            ${a.status === 'pending' ? `<button onclick="markPaid(${a.id})">標記已給款</button>` : '已給款'}
+            ${a.status==='pending'? `<button onclick="markPaid(${a.id})">標記已給款</button>`:'已給款'}
             <button onclick="repay(${a.id})">登記還款</button>
           </td>
         `;
         tbody.appendChild(tr);
       });
 
-      document.getElementById('stats').innerText = 
+      document.getElementById('stats').innerText =
         `學校金額總和：${schoolTotal}，學生會金額總和：${studentTotal}`;
     }
 
-    async function markPaid(id) {
-      await fetch(`/markPaid/${id}`, { method: 'POST' });
+    async function markPaid(id){
+      await fetch(`/markPaid/${id}`, { method:'POST' });
       loadAdvances();
     }
 
-    async function repay(id) {
-      const school_paid = parseFloat(prompt('學校已還金額：', '0'));
-      const student_council_paid = parseFloat(prompt('學生會已還金額：', '0'));
-      await fetch('/repay', {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify({ advance_id: id, school_paid, student_council_paid })
+    async function repay(id){
+      const school_paid = parseFloat(prompt('學校已還金額：','0'));
+      const student_council_paid = parseFloat(prompt('學生會已還金額：','0'));
+      await fetch('/repay',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ advance_id:id, school_paid, student_council_paid })
       });
       loadAdvances();
     }
