@@ -20,25 +20,22 @@ let users = [
 let advances = [];
 let repayments = [];
 
-// ---------- 登入 ----------
-app.post('/login', (req, res)=>{
+// ---------- 登入 / 登出 ----------
+app.post('/login', (req,res)=>{
   const { username, password } = req.body;
   const user = users.find(u=>u.username===username && u.password===password);
   if(user){
     req.session.user = { username: user.username, role: user.role };
-    res.json({ success:true, role:user.role });
-  } else {
-    res.json({ success:false });
-  }
+    res.json({ success:true, role:user.role, username:user.username });
+  } else res.json({ success:false });
 });
 
-// ---------- 登出 ----------
 app.post('/logout', (req,res)=>{
   req.session.destroy();
   res.json({success:true});
 });
 
-// ---------- 用戶管理 API ----------
+// ---------- 權限中介 ----------
 function authAdmin(req,res,next){
   if(!req.session.user || req.session.user.role!=='admin') return res.status(403).json({ message:'無權限' });
   next();
@@ -49,12 +46,11 @@ function authLoggedIn(req,res,next){
   next();
 }
 
-// 取得所有使用者
+// ---------- 用戶管理 API ----------
 app.get('/users', authLoggedIn, (req,res)=>{
   res.json(users.map(u=>({username:u.username, role:u.role})));
 });
 
-// 新增使用者（admin 才能）
 app.post('/users', authAdmin, (req,res)=>{
   const { username, password, role } = req.body;
   if(users.find(u=>u.username===username)) return res.json({message:'使用者已存在'});
@@ -62,22 +58,18 @@ app.post('/users', authAdmin, (req,res)=>{
   res.json({message:'新增成功'});
 });
 
-// 修改密碼
 app.post('/users/:username/password', authLoggedIn, (req,res)=>{
   const { username } = req.params;
   const { newPassword } = req.body;
   const loginUser = req.session.user;
-
   if(loginUser.role!=='admin' && loginUser.username!==username)
     return res.status(403).json({message:'無權限'});
-
   const user = users.find(u=>u.username===username);
   if(!user) return res.json({message:'使用者不存在'});
   user.password = newPassword;
   res.json({message:'修改成功'});
 });
 
-// 刪除使用者（admin 才能，且不能刪 admin 自己）
 app.delete('/users/:username', authAdmin, (req,res)=>{
   const { username } = req.params;
   if(username==='admin') return res.json({message:'不能刪除 admin'});
@@ -87,7 +79,7 @@ app.delete('/users/:username', authAdmin, (req,res)=>{
   res.json({message:'刪除成功'});
 });
 
-// ---------- 預支管理 API ----------
+// ---------- 預支管理 ----------
 app.get('/advances', authLoggedIn, (req,res)=>{
   res.json(advances);
 });
@@ -106,7 +98,6 @@ app.post('/advances', authLoggedIn, (req,res)=>{
   res.json({message:'預支申請成功'});
 });
 
-// 標記給款
 app.post('/markPaid/:id', authLoggedIn, (req,res)=>{
   const id = parseInt(req.params.id);
   const advance = advances.find(a=>a.id===id);
@@ -115,17 +106,24 @@ app.post('/markPaid/:id', authLoggedIn, (req,res)=>{
   res.json({message:'已標記給款'});
 });
 
-// 登記還款
+// ---------- 還款管理 ----------
 app.post('/repay', authLoggedIn, (req,res)=>{
-  const { advance_id, school_paid, student_council_paid, remaining_cash } = req.body;
+  const { advance_id, school_paid, student_council_paid } = req.body;
+  const advance = advances.find(a=>a.id===advance_id);
+  if(!advance) return res.json({message:'找不到預支'});
+
+  const remaining_cash = advance.total_amount - school_paid - student_council_paid;
   repayments.push({
-    advance_id, school_paid, student_council_paid, remaining_cash,
+    advance_id,
+    school_paid,
+    student_council_paid,
+    remaining_cash,
     repayment_date: new Date().toLocaleDateString()
   });
-  res.json({message:'已登記還款'});
+
+  res.json({message:'已登記還款', remaining_cash});
 });
 
-// 取得特定預支的還款紀錄
 app.get('/repayments', authLoggedIn, (req,res)=>{
   const advance_id = parseInt(req.query.advance_id);
   res.json(repayments.filter(r=>r.advance_id===advance_id));
