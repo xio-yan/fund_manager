@@ -13,10 +13,9 @@ app.use(session({
   saveUninitialized: true
 }));
 
-// ================== 資料庫 ==================
+// ===== 資料庫 =====
 const db = new sqlite3.Database('./fund.db');
 
-// 建表
 db.serialize(()=>{
   db.run(`CREATE TABLE IF NOT EXISTS advances (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,8 +23,6 @@ db.serialize(()=>{
     activity TEXT,
     apply_date TEXT,
     total_amount REAL,
-    school_amount REAL,
-    student_council_amount REAL,
     status TEXT
   )`);
 
@@ -43,14 +40,15 @@ db.serialize(()=>{
     repayment_date TEXT,
     school_paid REAL,
     student_council_paid REAL,
-    remaining_cash REAL
+    remaining_cash REAL,
+    confirmed INTEGER
   )`);
 });
 
-// ================== 靜態檔案 ==================
+// ===== 靜態檔案 =====
 app.use(express.static('public'));
 
-// ================== 登入驗證 ==================
+// ===== 登入驗證 =====
 app.post('/login', (req,res)=>{
   const { username, password } = req.body;
   if(username==='admin' && password==='admin'){
@@ -66,24 +64,17 @@ function checkAuth(req,res,next){
   else res.redirect('/login.html');
 }
 
-// 後台頁面保護
 app.get('/dashboard.html', checkAuth, (req,res,next)=>{ next(); });
 
-// ================== 新增預支 ==================
+// ===== 新增預支 =====
 app.post('/advance', (req,res)=>{
   const { name, activity, items } = req.body;
   const apply_date = new Date().toISOString().split('T')[0];
+  let total = 0;
+  items.forEach(i=> total+=i.amount);
 
-  let total = 0, school_total = 0, studentTotal = 0;
-  items.forEach(item=>{
-    total += item.amount;
-    if(item.source==='school') school_total += item.amount;
-    else studentTotal += item.amount;
-  });
-
-  db.run(`INSERT INTO advances (name, activity, apply_date, total_amount, school_amount, student_council_amount, status)
-          VALUES (?,?,?,?,?,?,?)`,
-          [name, activity, apply_date, total, school_total, studentTotal, 'pending'], function(err){
+  db.run(`INSERT INTO advances (name, activity, apply_date, total_amount, status)
+          VALUES (?,?,?,?,?)`, [name, activity, apply_date, total, 'pending'], function(err){
     if(err) return res.status(500).send(err.message);
     const advance_id = this.lastID;
     items.forEach(item=>{
@@ -94,15 +85,25 @@ app.post('/advance', (req,res)=>{
   });
 });
 
-// ================== 查詢所有預支 ==================
+// ===== 查詢所有預支及明細 =====
 app.get('/advances', (req,res)=>{
-  db.all(`SELECT * FROM advances`, (err,rows)=>{
+  db.all(`SELECT * FROM advances`, (err,advances)=>{
     if(err) return res.status(500).send(err.message);
-    res.send(rows);
+    let result = [];
+    let count=0;
+    if(advances.length===0) return res.send([]);
+    advances.forEach(a=>{
+      db.all(`SELECT * FROM advance_items WHERE advance_id=?`, [a.id], (err,items)=>{
+        if(err) return res.status(500).send(err.message);
+        result.push({ ...a, items });
+        count++;
+        if(count===advances.length) res.send(result);
+      });
+    });
   });
 });
 
-// ================== 標記已給款 ==================
+// ===== 標記已給款 =====
 app.post('/markPaid/:id', (req,res)=>{
   const id = req.params.id;
   db.run(`UPDATE advances SET status='paid' WHERE id=?`, [id], function(err){
@@ -111,25 +112,21 @@ app.post('/markPaid/:id', (req,res)=>{
   });
 });
 
-// ================== 登記還款 ==================
+// ===== 登記還款 =====
 app.post('/repay', (req,res)=>{
-  const { advance_id, school_paid, student_council_paid } = req.body;
+  const { advance_id, school_paid, student_council_paid, remaining_cash } = req.body;
   const repayment_date = new Date().toISOString().split('T')[0];
 
-  db.get(`SELECT total_amount FROM advances WHERE id=?`, [advance_id], (err, advance)=>{
+  db.run(`INSERT INTO repayments (advance_id, repayment_date, school_paid, student_council_paid, remaining_cash, confirmed)
+          VALUES (?,?,?,?,?,?)`,
+          [advance_id, repayment_date, school_paid, student_council_paid, remaining_cash, 1], (err)=>{
     if(err) return res.status(500).send(err.message);
-    const remaining = advance.total_amount - school_paid - student_council_paid;
-
-    db.run(`INSERT INTO repayments (advance_id, repayment_date, school_paid, student_council_paid, remaining_cash)
-            VALUES (?,?,?,?,?)`,
-            [advance_id, repayment_date, school_paid, student_council_paid, remaining], (err)=>{
-      if(err) return res.status(500).send(err.message);
-      res.send({ message:'還款紀錄成功', remaining });
-    });
+    db.run(`UPDATE advances SET status='repaid' WHERE id=?`, [advance_id]);
+    res.send({ message:'還款完成', remaining_cash });
   });
 });
 
-// ================== 啟動伺服器 ==================
+// ===== 啟動伺服器 =====
 const listener = app.listen(process.env.PORT || 3000, ()=>{
   console.log('Server running on port '+listener.address().port);
 });
