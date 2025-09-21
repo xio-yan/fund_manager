@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const session = require('express-session');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 app.use(bodyParser.json());
@@ -22,7 +23,14 @@ function taiwanDate(){
 }
 
 // ===== 資料庫 =====
-const db = new sqlite3.Database('./fund.db');
+// Render 永久存放路徑
+const dbPath = process.env.DATABASE_PATH || path.join(__dirname, 'fund.db');
+
+// 確保資料夾存在
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+
+const db = new sqlite3.Database(dbPath);
 
 db.serialize(()=>{
   db.run(`CREATE TABLE IF NOT EXISTS advances (
