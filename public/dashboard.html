@@ -10,7 +10,7 @@
   <button onclick="logout()">登出</button>
   <a href="/">返回首頁</a>
 
-  <h2>活動與款項</h2>
+  <h2>活動列表</h2>
   <div id="activities"></div>
 
   <script>
@@ -26,36 +26,26 @@
 
     async function loadActivities() {
       const res = await fetch("/api/activities");
-      const activities = await res.json();
+      const acts = await res.json();
       const container = document.getElementById("activities");
       container.innerHTML = "";
-      activities.forEach(act => {
+      acts.forEach(act => {
         const div = document.createElement("div");
-        div.innerHTML = `<h3>${act.name} - 申請人：${act.applicant} (${act.applyDate})</h3>`;
+        div.innerHTML = `<h3>${act.name} - 申請人：${act.applicant} (${act.applyDate})</h3>
+          <button onclick="payActivity(${act.id})">給款</button>
+          <button onclick="repayActivity(${act.id})">還款</button>`;
         const table = document.createElement("table");
         table.border = 1;
         table.innerHTML = `<tr>
           <th>用途</th><th>金額</th><th>來源</th><th>狀態</th>
-          <th>申請日</th><th>給款日</th><th>還款日</th><th>學校補助</th><th>學生會補助</th><th>剩餘現金</th><th>操作</th>
+          <th>申請日</th><th>給款日</th><th>還款日</th>
+          <th>學校補助</th><th>學生會補助</th><th>剩餘現金</th>
         </tr>`;
-        act.items.forEach(item => {
+        act.items.forEach(it => {
           const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td>${item.description}</td>
-            <td>${item.amount}</td>
-            <td>${item.source}</td>
-            <td>${item.status}</td>
-            <td>${item.applyDate}</td>
-            <td>${item.payDate || ""}</td>
-            <td>${item.repayDate || ""}</td>
-            <td>${item.schoolSubsidy}</td>
-            <td>${item.studentUnionSubsidy}</td>
-            <td>${item.cashReturn}</td>
-            <td>
-              ${item.status === "申請中" ? `<button onclick="pay(${act.id},${item.id})">已付款</button>` : ""}
-              ${item.status === "已付款" ? `<button onclick="repayPrompt(${act.id},${item.id})">還款</button>` : ""}
-            </td>
-          `;
+          tr.innerHTML = `<td>${it.description}</td><td>${it.amount}</td><td>${it.source}</td>
+            <td>${it.status}</td><td>${it.applyDate}</td><td>${it.payDate||""}</td><td>${it.repayDate||""}</td>
+            <td>${it.schoolSubsidy}</td><td>${it.studentUnionSubsidy}</td><td>${it.cashReturn}</td>`;
           table.appendChild(tr);
         });
         div.appendChild(table);
@@ -63,16 +53,16 @@
       });
     }
 
-    async function pay(activityId, itemId) {
-      await fetch(`/api/activity/${activityId}/item/${itemId}/pay`, { method: "POST" });
+    async function payActivity(id) {
+      await fetch(`/api/activity/${id}/pay`, { method: "POST" });
       loadActivities();
     }
 
-    async function repayPrompt(activityId, itemId) {
+    async function repayActivity(id) {
       const schoolSubsidy = prompt("輸入學校補助金額：", "0");
       const studentUnionSubsidy = prompt("輸入學生會補助金額：", "0");
       if (schoolSubsidy !== null && studentUnionSubsidy !== null) {
-        await fetch(`/api/activity/${activityId}/item/${itemId}/repay`, {
+        await fetch(`/api/activity/${id}/repay`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ schoolSubsidy, studentUnionSubsidy })
