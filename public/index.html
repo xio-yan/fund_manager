@@ -15,7 +15,12 @@
       <div class="item">
         用途：<input name="description" required>
         金額：<input type="number" name="amount" required>
-        來源：<input name="source" required>
+        來源：
+        <select name="source" required>
+          <option value="學校">學校</option>
+          <option value="學生會">學生會</option>
+        </select>
+        <button type="button" class="removeItem">刪除</button>
       </div>
     </div>
     <button type="button" id="addItem">新增款項</button><br><br>
@@ -26,15 +31,31 @@
   <a href="/login.html">進入後台</a>
 
   <script>
-    document.getElementById("addItem").addEventListener("click", () => {
+    function addItem() {
       const div = document.createElement("div");
       div.className = "item";
       div.innerHTML = `
         用途：<input name="description" required>
         金額：<input type="number" name="amount" required>
-        來源：<input name="source" required>
+        來源：
+        <select name="source" required>
+          <option value="學校">學校</option>
+          <option value="學生會">學生會</option>
+        </select>
+        <button type="button" class="removeItem">刪除</button>
       `;
       document.getElementById("itemsContainer").appendChild(div);
+
+      div.querySelector(".removeItem").addEventListener("click", () => {
+        div.remove();
+      });
+    }
+
+    document.getElementById("addItem").addEventListener("click", addItem);
+
+    // 刪除初始那筆
+    document.querySelector(".removeItem").addEventListener("click", function() {
+      this.parentElement.remove();
     });
 
     document.getElementById("advanceForm").addEventListener("submit", async e => {
@@ -55,11 +76,20 @@
       if (data.success) {
         document.getElementById("message").innerText = "送出成功！";
         e.target.reset();
-        document.getElementById("itemsContainer").innerHTML = `<h3>款項明細</h3><div class="item">
+        document.getElementById("itemsContainer").innerHTML = `<h3>款項明細</h3>
+        <div class="item">
           用途：<input name="description" required>
           金額：<input type="number" name="amount" required>
-          來源：<input name="source" required>
+          來源：
+          <select name="source" required>
+            <option value="學校">學校</option>
+            <option value="學生會">學生會</option>
+          </select>
+          <button type="button" class="removeItem">刪除</button>
         </div>`;
+        document.querySelector(".removeItem").addEventListener("click", function() {
+          this.parentElement.remove();
+        });
       } else {
         document.getElementById("message").innerText = "送出失敗！";
       }
