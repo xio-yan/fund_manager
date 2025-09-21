@@ -1,28 +1,33 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>後台登入</title>
+  <title>登入</title>
 </head>
 <body>
-  <h1>後台登入</h1>
+  <h1>出納後台登入</h1>
   <form id="loginForm">
-    帳號: <input type="text" name="username"><br>
-    密碼: <input type="password" name="password"><br>
+    <label>帳號: </label><input type="text" id="username"><br>
+    <label>密碼: </label><input type="password" id="password"><br>
     <button type="submit">登入</button>
+    <button type="button" onclick="location.href='index.html'">返回首頁</button>
   </form>
 
   <script>
-    document.getElementById('loginForm').addEventListener('submit', async function(e){
+    document.getElementById('loginForm').addEventListener('submit', async (e)=>{
       e.preventDefault();
-      const formData = new FormData(e.target);
-      const res = await fetch('/login',{
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const res = await fetch('/login', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ username: formData.get('username'), password: formData.get('password') })
+        body: JSON.stringify({ username, password })
       });
       const data = await res.json();
-      if(data.success) window.location.href='/dashboard.html';
-      else alert('帳號或密碼錯誤');
+      if(data.success){
+        location.href='dashboard.html';
+      } else {
+        alert('帳號或密碼錯誤');
+      }
     });
   </script>
 </body>
