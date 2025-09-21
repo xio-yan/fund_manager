@@ -13,6 +13,8 @@
 </head>
 <body>
   <h1>出納後台管理</h1>
+  <button onclick="location.href='index.html'">返回首頁</button>
+  <button onclick="logout()">登出</button>
 
   <table id="advancesTable">
     <thead>
@@ -99,6 +101,11 @@
         body: JSON.stringify({ advance_id:id, school_paid, student_council_paid, remaining_cash })
       });
       loadAdvances();
+    }
+
+    async function logout(){
+      await fetch('/logout', { method:'POST' });
+      location.href='login.html';
     }
 
     loadAdvances();
