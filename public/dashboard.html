@@ -1,31 +1,119 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-Hant">
 <head>
+  <meta charset="UTF-8">
   <title>出納後台</title>
   <style>
-    table, th, td { border:1px solid black; border-collapse: collapse; padding:5px; }
-    th { background-color:#f2f2f2; }
-    .items-table { margin-top:5px; margin-bottom:10px; }
-    .items-table th { background-color:#ddd; }
-    .repayments-table { margin-top:5px; margin-bottom:10px; }
-    .repayments-table th { background-color:#cfc; }
+    body {
+      font-family: "Microsoft JhengHei", sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      background: #2c3e50;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .top-bar {
+      max-width: 1000px;
+      margin: 20px auto;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 2px;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #2980b9;
+    }
+
+    .danger-btn {
+      background: #e74c3c;
+    }
+    .danger-btn:hover {
+      background: #c0392b;
+    }
+
+    main {
+      max-width: 1000px;
+      margin: 20px auto;
+      background: #fff;
+      padding: 20px 25px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+
+    th {
+      background: #f2f2f2;
+    }
+
+    .items-table th {
+      background: #e8f6ff;
+    }
+
+    .repayments-table th {
+      background: #eaffea;
+    }
+
+    tr:nth-child(even) {
+      background: #fafafa;
+    }
   </style>
 </head>
 <body>
-  <h1>出納後台管理</h1>
-  <button onclick="location.href='index.html'">返回首頁</button>
-  <button onclick="logout()">登出</button>
+  <header>
+    <h1>出納後台管理</h1>
+  </header>
 
-  <table id="advancesTable">
-    <thead>
-      <tr>
-        <th>ID</th><th>姓名</th><th>活動</th>
-        <th>申請日期</th><th>給款日期</th>
-        <th>總金額</th><th>狀態</th><th>操作</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <div class="top-bar">
+    <button onclick="location.href='index.html'">返回首頁</button>
+    <button class="danger-btn" onclick="logout()">登出</button>
+  </div>
+
+  <main>
+    <table id="advancesTable">
+      <thead>
+        <tr>
+          <th>ID</th><th>姓名</th><th>活動</th>
+          <th>申請日期</th><th>給款日期</th>
+          <th>總金額</th><th>狀態</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
 
   <script>
     let advances = [];
