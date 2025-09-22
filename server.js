@@ -22,8 +22,13 @@ function taiwanDate(){
   return tw.toISOString().split('T')[0];
 }
 
+// ===== 金額格式化工具 =====
+function formatAmount(num) {
+  if (num === null || num === undefined) return num;
+  return Number(num).toLocaleString('zh-TW');
+}
+
 // ===== 資料庫 =====
-// Render 永久存放路徑
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, 'fund.db');
 
 // 確保資料夾存在
@@ -120,7 +125,19 @@ app.get('/advances', (req,res)=>{
     advances.forEach(a=>{
       db.all(`SELECT * FROM advance_items WHERE advance_id=?`, [a.id], (err,items)=>{
         if(err) return res.status(500).send(err.message);
-        result.push({ ...a, items });
+
+        // 格式化 item 金額
+        const formattedItems = items.map(i => ({
+          ...i,
+          amount_formatted: formatAmount(i.amount)
+        }));
+
+        result.push({ 
+          ...a, 
+          total_amount_formatted: formatAmount(a.total_amount), 
+          items: formattedItems 
+        });
+
         count++;
         if(count === advances.length) {
           result.sort((x,y)=>x.id-y.id);
@@ -155,7 +172,12 @@ app.post('/repay', (req,res)=>{
             [advance_id, repayment_date, school_paid, student_council_paid, remaining_cash, 1], (err)=>{
       if(err) return res.status(500).send(err.message);
       db.run(`UPDATE advances SET status='repaid' WHERE id=?`, [advance_id]);
-      res.send({ message:'還款完成', remaining_cash, repayment_date });
+      res.send({ 
+        message:'還款完成', 
+        remaining_cash, 
+        remaining_cash_formatted: formatAmount(remaining_cash), 
+        repayment_date 
+      });
     });
   });
 });
@@ -165,7 +187,15 @@ app.get('/repayments', (req,res)=>{
   const advance_id = req.query.advance_id;
   db.all(`SELECT * FROM repayments WHERE advance_id=? ORDER BY id ASC`, [advance_id], (err, rows)=>{
     if(err) return res.status(500).send(err.message);
-    res.send(rows);
+
+    const formattedRows = rows.map(r => ({
+      ...r,
+      school_paid_formatted: formatAmount(r.school_paid),
+      student_council_paid_formatted: formatAmount(r.student_council_paid),
+      remaining_cash_formatted: formatAmount(r.remaining_cash)
+    }));
+
+    res.send(formattedRows);
   });
 });
 
@@ -173,4 +203,3 @@ app.get('/repayments', (req,res)=>{
 const listener = app.listen(process.env.PORT || 3000, ()=>{
   console.log('Server running on port '+listener.address().port);
 });
-
