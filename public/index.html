@@ -1,184 +1,204 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <title>KHUSCSU經費預支系統</title>
-  <style>
-    body {
-      font-family: "Microsoft JhengHei", sans-serif;
-      background: #f4f6f9;
-      margin: 0;
-      padding: 0;
-    }
+    <meta charset="UTF-8">
+    <title>KHUSCSU經費預支系統</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 0;
+        }
 
-    header {
-      background: #2c3e50;
-      color: white;
-      padding: 20px;
-      text-align: center;
-    }
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
 
-    h1 {
-      margin: 0;
-      font-size: 24px;
-    }
+        h1 {
+            margin: 0;
+            font-size: 24px;
+        }
 
-    main {
-      max-width: 700px;
-      margin: 30px auto;
-      background: #fff;
-      padding: 25px 30px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
+        main {
+            max-width: 700px;
+            margin: 30px auto;
+            background: #fff;
+            padding: 25px 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 2; /* 內容在浮水印之上 */
+        }
 
-    form label {
-      display: block;
-      margin: 12px 0 5px;
-      font-weight: bold;
-    }
+        .item-block {
+            padding: 15px;
+            margin-bottom: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
 
-    input[type="text"],
-    input[type="number"],
-    select {
-      width: 100%;
-      padding: 8px 10px;
-      margin-bottom: 10px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      font-size: 14px;
-      transition: border 0.2s;
-    }
+        form label {
+            display: block;
+            margin: 12px 0 5px;
+            font-weight: bold;
+        }
 
-    input:focus, select:focus {
-      border-color: #3498db;
-      outline: none;
-    }
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border 0.2s;
+        }
 
-    .item-block {
-      padding: 15px;
-      margin-bottom: 12px;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      background: #f9f9f9;
-    }
+            input:focus, select:focus {
+                border-color: #3498db;
+                outline: none;
+            }
 
-    button {
-      background: #3498db;
-      color: white;
-      border: none;
-      padding: 10px 18px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 14px;
-      margin-top: 10px;
-      transition: background 0.3s;
-    }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+            transition: background 0.3s;
+        }
 
-    button:hover {
-      background: #2980b9;
-    }
+            button:hover {
+                background: #2980b9;
+            }
 
-    .secondary-btn {
-      background: #95a5a6;
-    }
+        .secondary-btn {
+            background: #95a5a6;
+        }
 
-    .secondary-btn:hover {
-      background: #7f8c8d;
-    }
+            .secondary-btn:hover {
+                background: #7f8c8d;
+            }
 
-    hr {
-      margin: 25px 0;
-    }
-  </style>
+        hr {
+            margin: 25px 0;
+        }
+
+        /* 🔹 浮水印圖片層 */
+        .watermark {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* 不影響操作 */
+            z-index: 1;
+            background-image: url("logo.png");
+            background-repeat: repeat;
+            background-size: 200px auto;
+            opacity: 0.1;
+        }
+    </style>
 </head>
 <body>
-  <header>
-    <h1>KHUSCSU經費預支系統</h1>
-  </header>
+    <header>
+        <h1>KHUSCSU經費預支系統</h1>
+    </header>
 
-  <main>
-    <h2>新增預支</h2>
-    <form id="advanceForm">
-      <label>姓名:</label>
-      <input type="text" name="name" required>
+    <!-- 🔹 浮水印 -->
+    <div class="watermark"></div>
 
-      <label>活動名稱:</label>
-      <input type="text" name="activity" required>
+    <main>
+        <h2>新增預支</h2>
+        <form id="advanceForm">
+            <label>姓名:</label>
+            <input type="text" name="name" required>
 
-      <div id="items">
-        <div class="item-block">
-          <label>用途:</label>
-          <input type="text" name="description[]" required>
+            <label>活動名稱:</label>
+            <input type="text" name="activity" required>
 
-          <label>金額:</label>
-          <input type="number" name="amount[]" required>
+            <div id="items">
+                <div class="item-block">
+                    <label>用途:</label>
+                    <input type="text" name="description[]" required>
 
-          <label>來源:</label>
-          <select name="source[]">
-            <option value="school">學校</option>
-            <option value="student_council">學生會</option>
-          </select>
-        </div>
-      </div>
+                    <label>金額:</label>
+                    <input type="number" name="amount[]" required>
 
-      <button type="button" onclick="addItem()">＋ 新增用途</button><br><br>
-      <button type="submit">✔ 送出</button>
-    </form>
+                    <label>來源:</label>
+                    <select name="source[]">
+                        <option value="school">學校</option>
+                        <option value="student_council">學生會</option>
+                    </select>
+                </div>
+            </div>
 
-    <hr>
-    <button class="secondary-btn" onclick="window.location.href='/login.html'">前往後台</button>
-  </main>
+            <button type="button" onclick="addItem()">＋ 新增用途</button><br><br>
+            <button type="submit">✔ 送出</button>
+        </form>
 
-  <script>
-    function addItem() {
-      const div = document.createElement('div');
-      div.classList.add('item-block');
-      div.innerHTML = `
-        <label>用途:</label>
-        <input type="text" name="description[]" required>
+        <hr>
+        <button class="secondary-btn" onclick="window.location.href='/login.html'">前往後台</button>
+    </main>
 
-        <label>金額:</label>
-        <input type="number" name="amount[]" required>
+    <script>
+        function addItem() {
+            const div = document.createElement('div');
+            div.classList.add('item-block');
+            div.innerHTML = `
+            <label>用途:</label>
+            <input type="text" name="description[]" required>
 
-        <label>來源:</label>
-        <select name="source[]">
-          <option value="school">學校</option>
-          <option value="student_council">學生會</option>
-        </select>`;
-      document.getElementById('items').appendChild(div);
-    }
+            <label>金額:</label>
+            <input type="number" name="amount[]" required>
 
-    document.getElementById('advanceForm').addEventListener('submit', function(e){
-      e.preventDefault();
-      const formData = new FormData(e.target);
-      const items = [];
-      const descriptions = formData.getAll('description[]');
-      const amounts = formData.getAll('amount[]');
-      const sources = formData.getAll('source[]');
-      for(let i=0;i<descriptions.length;i++){
-        items.push({description: descriptions[i], amount: parseFloat(amounts[i]), source: sources[i]});
-      }
-      fetch('/advance', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({name: formData.get('name'), activity: formData.get('activity'), items})
-      }).then(res=>res.json()).then(data=>{
-        alert(JSON.stringify(data));
-        e.target.reset();
-        document.getElementById('items').innerHTML = `<div class="item-block">
-          <label>用途:</label>
-          <input type="text" name="description[]" required>
-          <label>金額:</label>
-          <input type="number" name="amount[]" required>
-          <label>來源:</label>
-          <select name="source[]">
-            <option value="school">學校</option>
-            <option value="student_council">學生會</option>
-          </select>
-        </div>`;
-      });
-    });
-  </script>
+            <label>來源:</label>
+            <select name="source[]">
+              <option value="school">學校</option>
+              <option value="student_council">學生會</option>
+            </select>`;
+            document.getElementById('items').appendChild(div);
+        }
+
+        document.getElementById('advanceForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const items = [];
+            const descriptions = formData.getAll('description[]');
+            const amounts = formData.getAll('amount[]');
+            const sources = formData.getAll('source[]');
+            for (let i = 0; i < descriptions.length; i++) {
+                items.push({ description: descriptions[i], amount: parseFloat(amounts[i]), source: sources[i] });
+            }
+            fetch('/advance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: formData.get('name'), activity: formData.get('activity'), items })
+            }).then(res => res.json()).then(data => {
+                alert(JSON.stringify(data));
+                e.target.reset();
+                document.getElementById('items').innerHTML = `<div class="item-block">
+              <label>用途:</label>
+              <input type="text" name="description[]" required>
+              <label>金額:</label>
+              <input type="number" name="amount[]" required>
+              <label>來源:</label>
+              <select name="source[]">
+                <option value="school">學校</option>
+                <option value="student_council">學生會</option>
+              </select>
+            </div>`;
+            });
+        });
+    </script>
 </body>
 </html>
