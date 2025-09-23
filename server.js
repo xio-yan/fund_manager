@@ -4,7 +4,7 @@ const session = require('express-session');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
-const nodemailer = require('nodemailer');
+const nodemailer = require('nodemailer'); // <<< 新增
 
 const app = express();
 app.use(bodyParser.json());
@@ -68,10 +68,8 @@ db.serialize(() => {
   )`);
 });
 
-// ===== 靜態檔案 (公開區) =====
-app.use(express.static('public', {
-    index: false // 禁止直接用資料夾索引
-}));
+// ===== 靜態檔案 =====
+app.use(express.static('public'));
 
 // ===== 登入驗證 =====
 app.post('/login', (req, res) => {
@@ -90,16 +88,12 @@ function checkAuth(req, res, next) {
 }
 
 // 登出
-app.post('/logout', checkAuth, (req, res) => {
-    req.session.destroy(() => {
-        res.send({ message: '已登出' });
-    });
+app.post('/logout', (req, res) => {
+    req.session.destroy();
+    res.send({ message: '已登出' });
 });
 
-// ===== 受保護頁面 =====
-app.get('/dashboard.html', checkAuth, (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
-});
+app.get('/dashboard.html', checkAuth, (req, res, next) => { next(); });
 
 // ===== 郵件寄送設定 =====
 const transporter = nodemailer.createTransport({
@@ -111,8 +105,8 @@ const transporter = nodemailer.createTransport({
 });
 const notifyEmail = process.env.NOTIFY_EMAIL || 'peggy110493@gmail.com';
 
-// ===== 新增預支 (受保護) =====
-app.post('/advance', checkAuth, (req, res) => {
+// ===== 新增預支 =====
+app.post('/advance', (req, res) => {
     const { name, activity, items } = req.body;
     const apply_date = taiwanDate();
     let total = 0;
@@ -157,8 +151,8 @@ app.post('/advance', checkAuth, (req, res) => {
     });
 });
 
-// ===== 查詢所有預支及明細 (受保護) =====
-app.get('/advances', checkAuth, (req, res) => {
+// ===== 查詢所有預支及明細 =====
+app.get('/advances', (req, res) => {
     db.all(`SELECT * FROM advances`, (err, advances) => {
         if (err) return res.status(500).send(err.message);
         if (advances.length === 0) return res.send([]);
@@ -191,8 +185,8 @@ app.get('/advances', checkAuth, (req, res) => {
     });
 });
 
-// ===== 標記已給款 (受保護) =====
-app.post('/markPaid/:id', checkAuth, (req, res) => {
+// ===== 標記已給款 =====
+app.post('/markPaid/:id', (req, res) => {
     const id = req.params.id;
     const paid_date = taiwanDate();
     db.run(`UPDATE advances SET status='paid', paid_date=? WHERE id=?`, [paid_date, id], function (err) {
@@ -201,8 +195,8 @@ app.post('/markPaid/:id', checkAuth, (req, res) => {
     });
 });
 
-// ===== 登記還款 (受保護) =====
-app.post('/repay', checkAuth, (req, res) => {
+// ===== 登記還款 =====
+app.post('/repay', (req, res) => {
     const { advance_id, school_paid, student_council_paid } = req.body;
     db.get(`SELECT total_amount FROM advances WHERE id=?`, [advance_id], (err, row) => {
         if (err) return res.status(500).send(err.message);
@@ -225,8 +219,8 @@ app.post('/repay', checkAuth, (req, res) => {
     });
 });
 
-// ===== 查詢單筆活動的還款紀錄 (受保護) =====
-app.get('/repayments', checkAuth, (req, res) => {
+// ===== 查詢單筆活動的還款紀錄 =====
+app.get('/repayments', (req, res) => {
     const advance_id = req.query.advance_id;
     db.all(`SELECT * FROM repayments WHERE advance_id=? ORDER BY id ASC`, [advance_id], (err, rows) => {
         if (err) return res.status(500).send(err.message);
